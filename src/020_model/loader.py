@@ -12,7 +12,7 @@ class IIASAChangeDataset(Dataset):
 
     def __init__(self, change_reference_file, timeseries_file,
                  bands=["Global_SR_B1", "Global_SR_B2", "Global_SR_B3", "Global_SR_B4",
-                        "Global_SR_B5", "Global_SR_B6", "Global_SR_B7", "Global_ST_B10"],
+                        "Global_SR_B5", "Global_SR_B6", "Global_SR_B7"],
                  classes=["bare", "burnt", "crops", "fallow_shifting_cultivation",
                           "grassland", "lichen_and_moss", "not_sure", "shrub",
                           "snow_and_ice", "tree", "urban_built_up", "water", "wetland_herbaceous"]
@@ -52,6 +52,9 @@ class IIASAChangeDataset(Dataset):
         
         fraction_change = fractions_this_year - fractions_last_year
         
+        # Make change a boolean based on whether more than 50% changed or not
+        boolean_change = sum(abs(fraction_change)) > 50*2
+        
         # Select the time series (all bands) of the right sample
         ts_list = []
         for band_idx in range(0, len(self.bands)):
@@ -63,12 +66,20 @@ class IIASAChangeDataset(Dataset):
             ts.name = self.bands[band_idx]
             ts_list.append(ts)
         ts_df = pandas.concat(ts_list, axis=1)
+        
+        # Cut the time series to the year of interest
+        ts_df = ts_df.loc[str(int(this_year - 1))]
+        
+        # Convert everything into tensors
+        ts_tensor = torch.as_tensor(ts_df.to_numpy())
 
-        sample = {'timeseries': ts_df, 'change': fraction_change, 'year': this_year}
+        sample = {'timeseries': ts_tensor, 'change': torch.tensor(boolean_change), 'year': this_year, 'id': sample_id}
 
         return sample
 
 MyData = IIASAChangeDataset(change_reference_file = "../../data/raw/Data_Global_quoted.csv",
                             timeseries_file = "../../data/raw/IIASAChange20152018_Landsat8_TS.gpkg")
-MyData[100]["timeseries"].plot()
-MyData[100]["change"]
+MyData[442]["timeseries"]
+MyData[442]["change"]
+MyData[442]["year"]
+MyData[442]["id"]
