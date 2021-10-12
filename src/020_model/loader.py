@@ -3,9 +3,11 @@ import torch
 import pandas
 import geopandas
 import re
+import math
+import datetime
 #import numpy as np
 #import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 class IIASAChangeDataset(Dataset):
     """IIASA 2015-2018 land cover change + Landsat 8 time series dataset."""
@@ -15,17 +17,22 @@ class IIASAChangeDataset(Dataset):
                         "Global_SR_B5", "Global_SR_B6", "Global_SR_B7"],
                  classes=["bare", "burnt", "crops", "fallow_shifting_cultivation",
                           "grassland", "lichen_and_moss", "not_sure", "shrub",
-                          "snow_and_ice", "tree", "urban_built_up", "water", "wetland_herbaceous"]
+                          "snow_and_ice", "tree", "urban_built_up", "water", "wetland_herbaceous"],
+                 torch=True
                 ):
         """
         Args:
             change_reference_file (string): CSV file that includes multiple years of observations of land cover change.
             timeseries_file (string): GeoPackage that includes Landsat 8 time series data.
+            bands (list of strings): which bands to load.
+            classes (list of strings): which classes to load.
+            torch (bool): whether the output is for PyTorch implementation (True) or for Python BFAST Monitor (False).
         """
         self.change_reference = pandas.read_csv(change_reference_file)
         self.timeseries = [geopandas.read_file(timeseries_file, layer=band) for band in bands]
         self.bands = bands
         self.classes = classes
+        self.torch = torch
         self.change_ref_end_years = self.change_reference.loc[self.change_reference["reference_year"] > 2015] # Exclude the first year, i.e. 2015
         
         # Get dates by parsing column names
@@ -67,19 +74,42 @@ class IIASAChangeDataset(Dataset):
             ts_list.append(ts)
         ts_df = pandas.concat(ts_list, axis=1)
         
-        # Cut the time series to the year of interest
-        ts_df = ts_df.loc[str(int(this_year - 1))]
         
-        # Convert everything into tensors
-        ts_tensor = torch.as_tensor(ts_df.to_numpy())
+        if self.torch:
+            # Cut the time series to the year of interest
+            ts_df = ts_df.loc[str(int(this_year))]
+            
+            # Convert everything into tensors
+            ts_tensor = torch.as_tensor(ts_df.to_numpy())
+            boolean_change = torch.tensor(boolean_change)
+        else:
+            # Cut the time series off at the end of the monitoring period (mind the ":")
+            ts_df = ts_df.loc[:str(int(this_year))]
+            # Output dates: the monitor period start as well as all timestamps
+            this_year = (datetime.datetime(int(this_year), 1, 1, 0, 0), list(ts_df.index.to_pydatetime()))
+            # Calculate NDVI
+            ndvi = ((ts_df["Global_SR_B5"] - ts_df["Global_SR_B4"]) / (ts_df["Global_SR_B5"] + ts_df["Global_SR_B4"]))
+            # Format output as an ndarray of dimensions length, width, 1
+            ts_tensor = ndvi.to_numpy().reshape(-1, 1, 1)
 
-        sample = {'timeseries': ts_tensor, 'change': torch.tensor(boolean_change), 'year': this_year, 'id': sample_id}
+        sample = {'timeseries': ts_tensor, 'change': boolean_change, 'year': this_year, 'id': sample_id}
 
         return sample
 
+# Test individual time series
 MyData = IIASAChangeDataset(change_reference_file = "../../data/raw/Data_Global_quoted.csv",
                             timeseries_file = "../../data/raw/IIASAChange20152018_Landsat8_TS.gpkg")
-MyData[442]["timeseries"]
+MyData[442]["timeseries"] # Transpose or not?
+MyData[442]["timeseries"][:,1]
 MyData[442]["change"]
 MyData[442]["year"]
 MyData[442]["id"]
+
+# Split into 30-70%
+
+Holdout = random_split(MyData, [math.floor(len(MyData)*0.7), math.ceil(len(MyData)*0.3)])
+
+train_dataloader = DataLoader(Holdout[0], batch_size=64, shuffle=True)
+test_dataloader = DataLoader(Holdout[1], batch_size=64, shuffle=True)
+
+next(iter(train_dataloader))
