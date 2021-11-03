@@ -1,28 +1,42 @@
 # Script to convert the GEE extracted points output CSVs into a compact GeoPackage
 library(sf)
 
-InputDir = file.path("..", "data", "GEE_extracted_points")
-DataFile = file.path("..", "data", "Data_Global_quoted.csv")
-OutFile = file.path("..", "data", "IIASAChange20152018_Landsat8_TS.gpkg")
+InputDir = file.path("..", "..", "data", "GEE_extracted_points")
+DataFile = file.path("..", "..", "data", "raw", "training_data_2015_100m_20190402_V4.csv")
+OutFile = file.path("..", "..", "data", "IIASATraining2015_Landsat8_TS.gpkg")
+Bands = c("SR_B1", "SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7")
+id = "location_id"
 
-InputFiles = list.files(InputDir, full.names = TRUE)
 # We need the original data to make it spatial so we can put it into a .gpkg
-OriginalData = st_read(DataFile, options=c("X_POSSIBLE_NAMES=centroid_x", "Y_POSSIBLE_NAMES=centroid_y"))
-UniqueData = OriginalData[!duplicated(OriginalData[["sample_id"]]),]
+OriginalData = st_read(DataFile, options=c("X_POSSIBLE_NAMES=x", "Y_POSSIBLE_NAMES=y"))
+UniqueData = OriginalData[!duplicated(OriginalData[[id]]),]
 # Keep only the coordinates and id
-UniqueData = UniqueData[,c("centroid_x", "centroid_y", "sample_id")]
+UniqueData = UniqueData[,c("x", "y", id)]
 
-ProcessBand = function(Filename)
+ListBands = function(Band) list.files(InputDir, pattern = glob2rx(paste0("*", Band, ".csv")), full.names = TRUE)
+InputFiles = lapply(Bands, ListBands)
+
+ProcessBand = function(Filenames)
 {
-    SingleBand = read.csv(Filename, stringsAsFactors=FALSE)
+    SingleBand = NULL
+    for (Filename in Filenames)
+    {
+        SingleFile = read.csv(Filename, stringsAsFactors=FALSE)
+        SingleBand[setdiff(names(SingleFile), names(SingleBand))] <- NA
+        SingleFile[setdiff(names(SingleBand), names(SingleFile))] <- NA
+        SingleBand = rbind(SingleBand, SingleFile)
+    }
     # Remove GEE-specific columns
     SingleBand = SingleBand[,! names(SingleBand) %in% c(".geo", "system.index")]
     # Explicitly use integers
-    SingleBand[,-c(ncol(SingleBand), ncol(SingleBand)-1)] = as.integer(round(as.matrix(SingleBand[,-c(ncol(SingleBand), ncol(SingleBand)-1)])))
-    SpatialBand = merge(UniqueData, SingleBand, by="sample_id")
+    NumericCols = grep(glob2rx("X????.??.??_*"), names(SingleBand))
+    SingleBand[, NumericCols] = as.integer(round(as.matrix(SingleBand[,NumericCols])))
+    # Sort columns by date
+    SingleBand = SingleBand[,order(names(SingleBand))]
+    SpatialBand = merge(UniqueData, SingleBand, by=id)
 
-    BandName = unlist(strsplit(basename(Filename), ".", fixed=TRUE))
-    BandName = paste0(BandName[-length(BandName)], collapse=".")
+    BandMatch = which(sapply(Bands, function(Band) length(grep(Band, Filenames[1])) > 0))
+    BandName = Bands[BandMatch]
 
     st_write(SpatialBand, OutFile, layer=BandName, append=TRUE)
 }
