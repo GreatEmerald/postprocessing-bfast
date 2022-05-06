@@ -2,16 +2,16 @@
 library(sf)
 
 InputDir = file.path("..", "..", "data", "GEE_extracted_points")
-DataFile = file.path("..", "..", "data", "raw", "training_data_2015_100m_20190402_V4.csv")
-OutFile = file.path("..", "..", "data", "IIASATraining2015_Landsat8_TS.gpkg")
+DataFile = file.path("..", "..", "data", "raw", "refdata_world_africa_included_locations_data20190709.csv")
+OutFile = file.path("..", "..", "data", "WURValidation2015_Landsat8_TS.gpkg")
 Bands = c("SR_B1", "SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7")
-id = "location_id"
+id = "sample_id"
 
 # We need the original data to make it spatial so we can put it into a .gpkg
-OriginalData = st_read(DataFile, options=c("X_POSSIBLE_NAMES=x", "Y_POSSIBLE_NAMES=y"))
+OriginalData = st_read(DataFile, options=c("X_POSSIBLE_NAMES=subpix_mean_x", "Y_POSSIBLE_NAMES=subpix_mean_y"))
 UniqueData = OriginalData[!duplicated(OriginalData[[id]]),]
 # Keep only the coordinates and id
-UniqueData = UniqueData[,c("x", "y", id)]
+UniqueData = UniqueData[,c("subpix_mean_x", "subpix_mean_y", id)]
 
 ListBands = function(Band) list.files(InputDir, pattern = glob2rx(paste0("*", Band, ".csv")), full.names = TRUE)
 InputFiles = lapply(Bands, ListBands)
