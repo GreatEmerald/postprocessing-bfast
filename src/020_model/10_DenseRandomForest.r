@@ -2,9 +2,9 @@ library(sf)
 library(ranger)
 library(reshape2)
 
-source("load-sampling-data.r")
+source("../utils/load-sampling-data.r")
 source("GetFeatures.r")
-source("covariate-names.r")
+source("../utils/covariate-names.r")
 source("../utils/utils.r")
 
 # Perform Random Forest training

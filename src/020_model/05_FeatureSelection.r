@@ -1,7 +1,7 @@
 library(sf)
 library(corrr)
 
-source("load-sampling-data.r")
+source("../utils/load-sampling-data.r")
 source("GetFeatures.r")
 source("../utils/utils.r")
 

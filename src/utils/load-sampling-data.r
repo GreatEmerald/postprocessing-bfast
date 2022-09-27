@@ -1,4 +1,4 @@
-source("covariate-names.r")
+source("../utils/covariate-names.r")
 
 
 # Updates the dominant_lc column based on the classes desired

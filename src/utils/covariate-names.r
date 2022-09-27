@@ -57,3 +57,28 @@ GetFeatureNames = function()
              VIs,
              apply(expand.grid(VIs, Timesteps, Stats), 1, paste, collapse="_")))
 }
+
+# Make names human-readable
+PrettifyNames = function(UglyNames)
+{
+    NameMap = function(x)
+    {
+        switch(x,
+        tree              ="Trees",
+        shrub             ="Shrubs",
+        grassland         ="Herbaceous",
+        crops             ="Cropland",
+        urban_built_up    ="Built-up",
+        bare              ="Bare land",
+        water             ="Inland water",
+        x)
+    }
+    if (is.list(UglyNames))
+    {
+        Result = lapply(UglyNames, sapply, NameMap)
+        names(Result) = sapply(names(Result), NameMap)
+    }
+    else
+        Result = sapply(UglyNames, NameMap)
+    return(Result)
+}

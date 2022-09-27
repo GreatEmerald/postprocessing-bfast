@@ -38,3 +38,15 @@ ZooToSF = function(zobj, sfobj)
     sfobj[datecols(sfobj)] = t(zobj)
     return(sfobj)
 }
+
+# Rescale predictions so that they add up to 100%
+ScalePredictions = function(Predictions, LeaveZeroes = TRUE)
+{
+    Predictions = as.matrix(Predictions)
+    Predictions[Predictions < 0] = 0
+    Predictions = Predictions / rowSums(Predictions) * 100
+    # There is a possibility that all classes have been predicted as 0, so we can't normalise.
+    # In that case we just keep them as 0%. It won't add up to 100%. Alternatively we can set it to 1/nclass.
+    Predictions[is.nan(Predictions)] = if (LeaveZeroes) 0 else 100/ncol(Predictions)
+    return(as.data.frame(Predictions))
+}
