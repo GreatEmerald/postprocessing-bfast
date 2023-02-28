@@ -1,3 +1,5 @@
+library(zoo)
+
 # Get all data.frame columns that have a date in it (according to the pattern)
 datecols = function(object, pattern="X????.??.??*")
 {

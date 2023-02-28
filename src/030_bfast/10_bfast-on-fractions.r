@@ -71,7 +71,7 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE, formul
             return(NULL)
         }
         # Filter out breaks by magnitude (<20)
-        BreakNo = length(bfl$breakpoints$breakpoints)
+        BreakNo = if (!is.na(bfl$breakpoints$breakpoints[1])) length(bfl$breakpoints$breakpoints) else 0
         Magnitude=0
         if (BreakNo > 0)
         {

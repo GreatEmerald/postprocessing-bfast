@@ -4,6 +4,36 @@ GetCommonClassNames = function()
     return(c("tree", "shrub", "grassland", "crops", "urban_built_up", "bare", "water"))
 }
 
+GetDynamicWorldNames = function()
+{
+    return(c("water", "trees", "grass", "flooded_vegetation", "crops", "shrub_and_scrub", "built", "bare", "snow_and_ice"))
+}
+
+RenameDW = function(df, harmonise=TRUE)
+{
+    NameMap = function(x)
+    {
+        switch(x,
+        trees             ="tree",
+        shrub_and_scrub   ="shrub",
+        grass             ="grassland",
+        built             ="urban_built_up",
+        x)
+    }
+    names(df) = sapply(names(df), NameMap)
+    if (harmonise)
+    {
+        MergeCols = function(df, ToRemove, IntegrateInto)
+        {
+            df[[IntegrateInto]] = df[[IntegrateInto]] + df[[ToRemove]]
+            df[[ToRemove]] = NULL
+        }
+        df = MergeCols(df, "flooded_vegetation", "grassland")
+        df = MergeCols(df, "snow_and_ice", "bare")
+    }
+    return(df)
+}
+
 # For plotting, using colours from CGLOPS
 GetCommonClassColours = function(prettify=FALSE, darken_amount=0)
 {

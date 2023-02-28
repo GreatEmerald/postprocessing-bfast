@@ -1,5 +1,9 @@
-source("../utils/covariate-names.r")
+library(reshape2)
+library(sf)
+library(pbapply)
 
+source("../utils/covariate-names.r")
+source("../utils/utils.r")
 
 # Updates the dominant_lc column based on the classes desired
 UpdateDominantLC = function(df, classes = GetCommonClassNames())
@@ -55,6 +59,7 @@ ReclassifyAndScale = function(df, output.classes=GetCommonClassNames())
     ClassMap = c(burnt="grassland",
                  fallow_shifting_cultivation="crops",
                  wetland_herbaceous="grassland",
+                 flooded_vegetation="grassland",
                  lichen_and_moss="grassland",
                  lichen="grassland",
                  fl.grass="grassland",
@@ -88,8 +93,8 @@ ReclassifyAndScale = function(df, output.classes=GetCommonClassNames())
 # Rename the columns of the reference dataset to match those in the IIASA 2015 dataset
 RenameReferenceData = function(df)
 {
-    NameMap = data.frame(from=c("trees", "grass", "urban"),
-                         to=c("tree", "grassland", "urban_built_up"))
+    NameMap = data.frame(from=c("trees", "grass", "urban", "shrub_and_scrub", "built"),
+                         to=c("tree", "grassland", "urban_built_up", "shrub", "urban_built_up"))
     NewNames = names(df)
     for (i in 1:nrow(NameMap))
         if (NameMap[i,"from"] %in% names(df))
@@ -99,3 +104,30 @@ RenameReferenceData = function(df)
     return(df)
 }
 
+# Convert a GPKG file into the same format as the reference data
+# (long format with one column per class)
+FlattenGPKG = function(filename)
+{
+    Classes = st_layers(filename)$name
+
+    MeltClass = function(Class)
+    {
+        ClassSF = st_read(filename, Class)
+        Result = melt(ClassSF, id.vars = "location_id", measure.vars = datecols(ClassSF), variable.name="timestamp.x", value.name=Class)
+        Result[["timestamp.x"]] = as.Date(Result[["timestamp.x"]], "X%Y.%m.%d")
+        return(Result)
+    }
+    ResultList = pblapply(Classes, MeltClass, cl=length(Classes))
+    
+    # Result = Reduce(merge, ResultList) # Slow option
+    
+    Cbind = function(df1, df2)
+    {
+        stopifnot(all(df1$timestamp.x == df2$timestamp.x))
+        stopifnot(all(df1$location_id == df2$location_id))
+        cbind(df1, df2[3])
+    }
+    Result = Reduce(Cbind, ResultList)
+    Result = Result[complete.cases(Result),]
+    return(Result)
+}
