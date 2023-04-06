@@ -13,9 +13,10 @@ source("../utils/covariate-names.r")
 source("../utils/load-sampling-data.r")
 
 # Read in reference and predictions
-RFFile = "../../data/predictions/summer/median_predictions.rds"
+#RFFile = "../../data/predictions/dynamicworld/dynamicworld.rds"
+RFFile = "../../data/predictions/summer/mean_predictions_scaled.rds"
 #ReferenceFile = "../../data/raw/reference_global_100m_orig&change_year2015-2019_20210407.csv"
-OutFile = "../../data/predictions/summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions.rds"
+OutFile = "../../data/predictions/summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions.rds"
 if (!dir.exists(dirname(OutFile)))
     dir.create(dirname(OutFile))
 
@@ -36,7 +37,13 @@ ScaledPredictions[GetCommonClassNames()] = ScalePredictions(ScaledPredictions[Ge
 # location_id is an integer of the location ID of interest
 # ... are bfastlite() parameters
 # fallback=TRUE means that on error, we return unchanged data. Else, we return NA
-FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE, formula=response~trend, h=23, fallback=FALSE, ...)
+# For Landsat 8 data, use start=c(2014, 5), frequency = 365.25/16
+# For Dynamic World, use start=c(2014, 15), frequency=365.25/5
+# Note that the start will not always be correct due to missing data at the beginning, but it does not matter
+FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE,
+    formula=response~trend, h=23, fallback=FALSE,
+    start=c(2014, 5), frequency = 365.25/16,
+    ...)
 {
     RFSlice = if (scaled) ScaledPredictions[ScaledPredictions$location_id == location_id, ] else
         RFPredictions[RFPredictions$location_id == location_id, ]
@@ -45,7 +52,7 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE, formul
                       RFSlice$timestamp.x < as.Date("2020-07-14"),]
     
     # If too cloudy, return no prediction
-    if (nrow(RFSlice) < h*2)
+    if (h > 1 && nrow(RFSlice) < h*2)
     {
         if (fallback) return(RFSlice)
         return(NULL)
@@ -60,7 +67,7 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE, formul
     Result = PointTS
     for (classidx in 1:length(GetCommonClassNames()))
     {
-        InData = ts(as.ts(PointTS[,classidx]), start=c(2014, 5), frequency = 365.25/16)
+        InData = ts(as.ts(PointTS[,classidx]), start=start, frequency = frequency)
         # Remove the unreliable start and end year
         #InData[1:23] = NA
         #InData[(length(InData)-23):length(InData)] = NA
@@ -95,7 +102,19 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE, formul
 #FitBFL(sample(RFPredictions$location_id, 1), plot=TRUE) # Takes 15 minutes
 
 # Run the function over all locations and save the result
-BFResult = pblapply(unique(RFPredictions$location_id), FitBFL, scaled=TRUE, mag_threshold=30, formula=response~trend+harmon, order=2, fallback=TRUE, h=12, cl=10)
+BFResult = pblapply(unique(RFPredictions$location_id), FitBFL,
+    scaled=TRUE, mag_threshold=30, formula=response~trend+harmon, order=2, fallback=TRUE,
+    h=0.16, start=c(2014, 5), frequency=365.25/16, cl=10)
+warnings()
+    
+dtypes = sapply(BFResult, function(x)class(x))
+errors = which(dtypes == "try-error")
+print(BFResult[errors])
+if (length(errors) > 0) {
+    warning(paste("Errors encountered in", round(length(errors) / length(dtypes) * 100), "% of the cases"))
+    BFResult = BFResult[-errors]
+}
+
 Result = do.call(rbind, BFResult)
 saveRDS(Result, OutFile)
 

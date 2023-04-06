@@ -144,7 +144,7 @@ for (InputFile in ValFiles)
             YearFromTable = Data[Data$dataYear == YearFrom,]
             YearToTable = Data[Data$dataYear == YearTo,]
             
-            if (!all(YearToTable$location_id == YearFromTable$location_id))
+            if (suppressWarnings(!all(YearToTable$location_id == YearFromTable$location_id)))
             {
                 # In some cases we have missing predictions for particular years,
                 # remove them from both years in that case

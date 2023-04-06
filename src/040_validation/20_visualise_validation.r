@@ -24,9 +24,16 @@ StatTable = StatTable[StatTable$model %in% c(
  "summer-bfbaseline-m02-harmon-scaled median_predictions.csv",
 # "summer-bfl-m20-harmon-scaled mean_predictions.csv",
  "summer-bfl-m30-harmon2-scaled-h12-fb mean_predictions.csv",
- "summer-bfl-m30-harmon2-scaled-h12-fb median_predictions.csv"
+ "summer-bfl-m30-harmon2-scaled-h12-fb median_predictions.csv",
+ "dynamicworld dynamicworld.csv",
+ "dynamicworld dynamicworld-m10.csv",
+ "dynamicworld-bfl predictions.csv"
  ),]
+# Should be ordered by levels(factor(StatTable$model))
 StatTable$model = factor(StatTable$model, labels=c(
+    "Dynamic World (threshold 10)",
+    "Dynamic World",
+    "Dynamic World + BFAST Lite (defaults)",
     "Dense RF regression (mean)",
     "Dense RF regression (median)",
     "Baseline yearly RF model (mean)",
@@ -34,7 +41,7 @@ StatTable$model = factor(StatTable$model, labels=c(
     "BFAST Lite model (mean)",
     "BFAST Lite model (median)"
     ))
-StatTable$model = ordered(StatTable$model, levels=unique(StatTable$model)[c(1,4,2,3)])
+#StatTable$model = ordered(StatTable$model, levels=unique(StatTable$model)[c(1,4,2,3)])
 # Take only RMSE, MAE, ME
 PlotTable = StatTable[!StatTable$Statistic %in% c("RMSEAdj", "ME"),]
 # Take only the overall accuracy
@@ -50,7 +57,7 @@ ggplot(OverallTable, aes(x=Statistic, y=value, fill=model)) +
     geom_bar(stat="identity", position="dodge") +
     geom_text(label=round(OverallTable$value, 2), position=position_dodge(width = .9), vjust = 0)
 
-ggsave("2022-08-30-statistics.pdf")
+ggsave("2023-03-06-statistics.pdf")
 
 # Scaled is always better, harmon2 is always better, m20 is always better
 # fallback is always better

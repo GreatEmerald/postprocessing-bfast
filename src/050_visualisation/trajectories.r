@@ -21,14 +21,15 @@ RFPredictions = readRDS("../../data/predictions/summer/mean_predictions_scaled.r
 RFMedian = readRDS("../../data/predictions/summer/median_predictions.rds")
 BFBaseline = readRDS("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions.rds")
 BFLPredictions = readRDS("../../data/predictions/summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions.rds")
+DWBFL = readRDS("../../data/predictions/dynamicworld-bfl-h016/predictions.rds")
 
 
 models = list(RFPredictions=RFPredictions, RFMedian=RFMedian, BFBaseline=BFBaseline,
-    BFLMedianPredictions=BFLPredictions, DynamicWorld = DynamicWorld)
+    BFLMedianPredictions=BFLPredictions, DynamicWorld = DynamicWorld, DWBFL = DWBFL)
 
 PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
     legend.pos="left", xlim=c(as.Date("2015-01-01"), as.Date("2020-01-01")),
-    grid=c(2, 3), title="", size=dev.size())
+    grid=c(3, 3), title="", size=dev.size())
 {
     # Filter all data to the location id
     ReferenceData = ReferenceData[ReferenceData$location_id == location_id,]
