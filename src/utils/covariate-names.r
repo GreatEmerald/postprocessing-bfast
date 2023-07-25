@@ -89,7 +89,9 @@ GetFeatureNames = function()
 }
 
 # Make names human-readable
-PrettifyNames = function(UglyNames)
+# RemovePattern: a pattern to remove from the names before prettification,
+#                default: '.?'
+PrettifyNames = function(UglyNames, RemovePattern = "\\..")
 {
     NameMap = function(x)
     {
@@ -100,9 +102,13 @@ PrettifyNames = function(UglyNames)
         crops             ="Cropland",
         urban_built_up    ="Built-up",
         bare              ="Bare land",
-        water             ="Inland water",
+        water             ="Water",
+        Overall           =" Overall",
         x)
     }
+    # Remove unwanted prefixes from the string
+    if (!is.null(RemovePattern) && RemovePattern != "")
+        UglyNames = sub(RemovePattern, "", UglyNames)
     if (is.list(UglyNames))
     {
         Result = lapply(UglyNames, sapply, NameMap)

@@ -81,28 +81,10 @@ ValFiles = unlist(ValFiles)
 
 for (InputFile in ValFiles)
 {
-    OutFile = sub("-val\\.csv$", ".csv", InputFile)
-    if (file.exists(OutFile))
+    OutFile = sub("-val\\.csv$", "-static-stats.csv", InputFile)
+    OutFileRel = sub("-val\\.csv$", "-static-stats-rel.csv", InputFile)
+    if (file.exists(OutFile) && file.exists(OutFileRel))
         next
-    
-    if (FALSE) {
-    Prediction = readRDS(InputFile)
-    Prediction$dataYear = lubridate::year(Prediction$timestamp.x)
-    Data = merge(Prediction, ReferenceData, by=c("location_id", "dataYear"))
-    # Filter to one per year, closest to the peak season
-    Data$season = lubridate::decimal_date(Data$timestamp.x) %% 1
-    #Results = lapply(unique(Data$location_id), ValidateLocation)
-    #Results = pbtapply(Data, list(Data$location_id), ValidateLocation)
-    #Results = by(Data, Data$location_id, ValidateLocation)
-    #Results = do.call(rbind, Results)
-    # Shift south hemisphere seasons by 0.5
-    Data[Data$subpix_mean_y < 0,"season"] = ShiftTime(Data[Data$subpix_mean_y < 0,"season"], 0.5)
-    # Shift everything by target season so that 0 = peak season
-    Data$season = ShiftTime(Data$season, TargetSeason)
-    
-    Results = by(Data, list(Data$location_id, Data$dataYear), GetPeakSeason)
-    Results = do.call(rbind, Results)
-    }
     
     Results = read.csv(InputFile, row.names=1)
     
@@ -110,6 +92,8 @@ for (InputFile in ValFiles)
     Prediction = Results[paste0(GetCommonClassNames(),".x")]
     StatTable = AccuracyStatTable(Prediction, Truth)
     write.csv(StatTable, OutFile)
+    StatTableRel = AccuracyStatTable(Prediction, Truth, relative = TRUE)
+    write.csv(StatTableRel, OutFileRel)
 }
 
 FractionColumns = c(paste0(GetCommonClassNames(),".y"),
@@ -121,7 +105,8 @@ ValFiles = list.files(InputDir, pattern=glob2rx("*-val.csv"), recursive = TRUE, 
 for (InputFile in ValFiles)
 {
     OutFile = sub("-val\\.csv$", "-change_stats_unscaled.csv", InputFile)
-    if (file.exists(OutFile))
+    OutFileRel = sub("-val\\.csv$", "-change_stats_unscaled-rel.csv", InputFile)
+    if (file.exists(OutFile) && file.exists(OutFileRel))
         next
         
     print(OutFile)
@@ -135,6 +120,7 @@ for (InputFile in ValFiles)
     {
         Data = if (DataType == "unscaled") Validations else ValidationsScaled
         OutFile = sub("-val\\.csv$", paste0("-change_stats_", DataType, ".csv"), InputFile)
+        OutFileRel = sub("-val\\.csv$", paste0("-change_stats_", DataType, "-rel.csv"), InputFile)
         # Get one table per year
         ChangesTable = NULL
         TargetYears = seq(min(Data$dataYear), max(Data$dataYear), 1)
@@ -159,10 +145,13 @@ for (InputFile in ValFiles)
             ChangeTable$Years = paste(YearFrom, YearTo, sep="-")
             
             ChangeFile = sub("-val\\.csv$", paste0("-change_",ChangeTable$Years[1],"_", DataType, ".csv"), InputFile)
+            ChangeFileRel = sub("-val\\.csv$", paste0("-change_",ChangeTable$Years[1],"_", DataType, "-rel.csv"), InputFile)
             Truth = ChangeTable[paste0(GetCommonClassNames(),".y")]
             Prediction = ChangeTable[paste0(GetCommonClassNames(),".x")]
             StatTable = AccuracyStatTable(Prediction, Truth)
             write.csv(StatTable, ChangeFile)
+            StatTableRel = AccuracyStatTable(Prediction, Truth, relative = TRUE)
+            write.csv(StatTableRel, ChangeFileRel)
             
             ChangesTable = rbind(ChangesTable, ChangeTable)
         }
@@ -173,5 +162,8 @@ for (InputFile in ValFiles)
         StatTable = AccuracyStatTable(Prediction, Truth)
         #AccuracyStatisticsPlots(Prediction, Truth)
         write.csv(StatTable, OutFile)
+        StatTableRel = AccuracyStatTable(Prediction, Truth, relative = TRUE)
+        #AccuracyStatisticsPlots(Prediction, Truth)
+        write.csv(StatTableRel, OutFileRel)
     }
 }

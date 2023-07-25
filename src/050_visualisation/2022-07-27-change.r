@@ -7,31 +7,61 @@ source("utils.r")
 ## New method for static map accuracy
 
 InputDir = "../../data/predictions"
-InputPattern = glob2rx("*.csv")
+#InputPattern = glob2rx("*.csv")
+InputPattern = glob2rx("*-static-stats*.csv")
 InputFiles = list.files(InputDir, pattern=InputPattern, recursive = TRUE, full.names = TRUE)
 # Remove -val and -change files etc.
-InputFiles = grep("(-val\\.csv|-change_.*\\.csv|-trend-stats\\.csv|-trends\\.csv)", InputFiles, value=TRUE, invert=TRUE)
+#InputFiles = grep("(-val\\.csv|-change_.*\\.csv|-trend-stats\\.csv|-trends\\.csv|-gradual_change_stats\\.csv|-trend-stats-yearly\\.csv|-trends-yearly\\.csv|-transition_.*\\.csv)", InputFiles, value=TRUE, invert=TRUE)
 
-ModelMap = c(`dynamicworld/dynamicworld.csv` = "Dynamic World",
-             `dynamicworld-loess/predictions.csv` = "Dynamic World + LOESS",
-             `dynamicworld-loess-s05/predictions.csv` = "Dynamic World + LOESS (a=0.5)",
-             #`dynamicworld/dynamicworld-m10.csv` = "Dynamic World (10% threshold)",
-             #`dynamicworld-bfl/predictions.csv` = "Dynamic World + BFL (h=72)",
-             `dynamicworld-bfl-h016/predictions.csv` = "Dynamic World + BFL (h=0.16)",
-             `dynamicworld-bfl-harmon1-h016/predictions.csv` = "Dynamic World + BFL (h=0.16, order=1)",
-             `dynamicworld-bfl-harmon3-h016/predictions.csv` = "Dynamic World + BFL (h=0.16, order=3)",
-             `dynamicworld-bfl-m30-harmon2-h016/predictions.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
-             `dynamicworld-bfl-m30-trend-h016/predictions.csv` = "Dynamic World + BFL (h=0.16, mag>30, trend)",
-             `summer/mean_predictions.csv` = "Random Forest mean vote",
-             #`summer/median_predictions.csv` = "Random Forest median vote",
-             `summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions.csv` = "RF mean + BFL (h=12)",
-             `summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions.csv` = "RF mean + BFL (h=0.16)",
-             #`summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions.csv` = "RF median + BFL (h=12)",
-             `summer-bfbaseline-m02-harmon-scaled/mean_predictions.csv` = "RF mean + NDVI BFL"
+ModelMap = c(`dynamicworld/dynamicworld-static-stats.csv` = "Dynamic World",
+             `dynamicworld-loess/predictions-static-stats.csv` = "Dynamic World + LOESS",
+             #`dynamicworld-loess-s05/predictions-static-stats.csv` = "Dynamic World + LOESS (a=0.5)",
+             #`dynamicworld/dynamicworld-m10-static-stats.csv` = "Dynamic World (10% threshold)",
+             #`dynamicworld-bfl/predictions-static-stats.csv` = "Dynamic World + BFL (h=72)",
+             #`dynamicworld-bfl-h016/predictions-static-stats.csv` = "Dynamic World + BFL (h=0.16)",
+             #`dynamicworld-bfl-harmon1-h016/predictions-static-stats.csv` = "Dynamic World + BFL (h=0.16, order=1)",
+             #`dynamicworld-bfl-harmon3-h016/predictions-static-stats.csv` = "Dynamic World + BFL (h=0.16, order=3)",
+             #`dynamicworld-bfl-m30-harmon2-h016/predictions-static-stats.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
+             `dynamicworld-bfl-m30-trend-h016/predictions-static-stats.csv` = "Dynamic World + BFAST Lite",# (h=0.16, mag>30, trend)",
+             `summer/mean_predictions-static-stats.csv` = "Random Forest regression",
+             #`summer/median_predictions-static-stats.csv` = "Random Forest median vote",
+             `summer-loess/mean_predictions-static-stats.csv` = "Random Forest + LOESS",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-static-stats.csv` = "RF mean + BFL (h=12)",
+             #`summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions-static-stats.csv` = "RF mean + BFL (h=0.16)",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions-static-stats.csv` = "RF median + BFL (h=12)",
+             `summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-static-stats.csv` = "Random Forest + BFAST Lite",# (h=0.16, mag>30, trend)",
+             `summer-bfbaseline-m02-harmon-scaled/mean_predictions-static-stats.csv` = "RF + NDVI-only BFAST Lite",
+             `summer-beast/mean-predictions-static-stats.csv` = "Random Forest + BEAST"
              #`summer-bfbaseline-m02-harmon-scaled/median_predictions.csv` = "RF median + NDVI BFL"
              )
 
-VisualiseModelStats(InputFiles=InputFiles, ModelMap = ModelMap, main="Static map accuracy", filename="../../output/2023-03-27-accuracy-stats.png")
+VisualiseModelStats(InputFiles=InputFiles, ModelMap = ModelMap, main="", Statistics=c("MAE", "ME"), filename="../../output/2023-06-21-accuracy-stats.pdf")
+
+# Relative accuracy
+
+ModelMap = c(`dynamicworld/dynamicworld-static-stats-rel.csv` = "Dynamic World",
+             `dynamicworld-loess/predictions-static-stats-rel.csv` = "Dynamic World + LOESS",
+             #`dynamicworld-loess-s05/predictions-static-stats-rel.csv` = "Dynamic World + LOESS (a=0.5)",
+             #`dynamicworld/dynamicworld-m10-static-stats-rel.csv` = "Dynamic World (10% threshold)",
+             #`dynamicworld-bfl/predictions-static-stats-rel.csv` = "Dynamic World + BFL (h=72)",
+             #`dynamicworld-bfl-h016/predictions-static-stats-rel.csv` = "Dynamic World + BFL (h=0.16)",
+             #`dynamicworld-bfl-harmon1-h016/predictions-static-stats-rel.csv` = "Dynamic World + BFL (h=0.16, order=1)",
+             #`dynamicworld-bfl-harmon3-h016/predictions-static-stats-rel.csv` = "Dynamic World + BFL (h=0.16, order=3)",
+             #`dynamicworld-bfl-m30-harmon2-h016/predictions-static-stats-rel.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
+             `dynamicworld-bfl-m30-trend-h016/predictions-static-stats-rel.csv` = "Dynamic World + BFL", #(h=0.16, mag>30, trend)",
+             `summer/mean_predictions-static-stats-rel.csv` = "Random Forest regression",
+             #`summer/median_predictions-static-stats-rel.csv` = "Random Forest median vote",
+             `summer-loess/mean_predictions-static-stats-rel.csv` = "Random Forest + LOESS",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-static-stats-rel.csv` = "RF mean + BFL (h=12)",
+             #`summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions-static-stats-rel.csv` = "RF mean + BFL (h=0.16)",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions-static-stats-rel.csv` = "RF median + BFL (h=12)",
+             `summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-static-stats-rel.csv` = "RF + BFAST Lite", #(h=0.16, mag>30, trend)",
+             `summer-bfbaseline-m02-harmon-scaled/mean_predictions-static-stats-rel.csv` = "RF + NDVI BFAST Lite",
+             `summer-beast/mean-predictions-static-stats-rel.csv` = "Random Forest + BEAST"
+             #`summer-bfbaseline-m02-harmon-scaled/median_predictions-rel.csv` = "RF median + NDVI BFL"
+             )
+
+VisualiseModelStats(InputFiles=InputFiles, ModelMap = ModelMap, main="Static map relative accuracy", filename="../../output/2023-04-26-relative-accuracy-stats.png")
 
 ## New method for change accuracy
 
@@ -41,24 +71,56 @@ InputFiles = list.files(InputDir, pattern=InputPattern, recursive = TRUE, full.n
 
 ModelMap = c(`dynamicworld/dynamicworld-change_stats_scaled.csv` = "Dynamic World",
              `dynamicworld-loess/predictions-change_stats_scaled.csv` = "Dynamic World + LOESS",
-             `dynamicworld-loess-s05/predictions-change_stats_scaled.csv` = "Dynamic World + LOESS (a=0.5)",
+             #`dynamicworld-loess-s05/predictions-change_stats_scaled.csv` = "Dynamic World + LOESS (a=0.5)",
              #`dynamicworld/dynamicworld-m10-change_stats_scaled.csv` = "Dynamic World (10% threshold)",
              #`dynamicworld-bfl/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=72)",
-             `dynamicworld-bfl-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16)",
-             `dynamicworld-bfl-harmon1-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, order=1)",
-             `dynamicworld-bfl-harmon3-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, order=3)",
-             `dynamicworld-bfl-m30-harmon2-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
-             `dynamicworld-bfl-m30-trend-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, mag>30, trend)",
-             `summer/mean_predictions-change_stats_scaled.csv` = "Random Forest mean vote",
+             #`dynamicworld-bfl-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16)",
+             #`dynamicworld-bfl-harmon1-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, order=1)",
+             #`dynamicworld-bfl-harmon3-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, order=3)",
+             #`dynamicworld-bfl-m30-harmon2-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
+             `dynamicworld-bfl-m30-trend-h016/predictions-change_stats_scaled.csv` = "Dynamic World + BFAST Lite",# (h=0.16, mag>30, trend)",
+             `summer/mean_predictions-change_stats_scaled.csv` = "Random Forest regression",
              #`summer/median_predictions-change_stats_scaled.csv` = "Random Forest median vote",
-             `summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-change_stats_scaled.csv` = "RF mean + BFL (h=12)",
-             `summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions-change_stats_scaled.csv` = "RF mean + BFL (h=0.16)",
+             `summer-loess/mean_predictions-change_stats_scaled.csv` = "Random Forest + LOESS",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-change_stats_scaled.csv` = "RF mean + BFL (h=12)",
+             #`summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions-change_stats_scaled.csv` = "RF mean + BFL (h=0.16)",
              #`summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions-change_stats_scaled.csv` = "RF median + BFL (h=12)",
-             `summer-bfbaseline-m02-harmon-scaled/mean_predictions-change_stats_scaled.csv` = "RF mean + NDVI BFL"
+             `summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-change_stats_scaled.csv` = "Random Forest + BFAST Lite", #(h=0.16, mag>30, trend)",
+             `summer-bfbaseline-m02-harmon-scaled/mean_predictions-change_stats_scaled.csv` = "RF + NDVI-only BFAST Lite",
+             `summer-beast/mean-predictions-change_stats_scaled.csv` = "Random Forest + BEAST"
              #`summer-bfbaseline-m02-harmon-scaled/median_predictions-change_stats_scaled.csv` = "RF median + NDVI BFL"
              )
 
-VisualiseModelStats(InputDir, InputPattern, ModelMap, main="Per-class pooled yearly change", filename="../../output/2023-03-27-change-accuracy-stats.png")
+VisualiseModelStats(InputDir, InputPattern, ModelMap = ModelMap, main="",  Statistics=c("MAE", "ME"), filename="../../output/2023-06-21-change-accuracy-stats.pdf")
+
+# Relative change
+
+InputPattern = glob2rx("*-change_stats_scaled-rel.csv")
+InputFiles = list.files(InputDir, pattern=InputPattern, recursive = TRUE, full.names = TRUE)
+
+ModelMap = c(`dynamicworld/dynamicworld-change_stats_scaled-rel.csv` = "Dynamic World",
+             `dynamicworld-loess/predictions-change_stats_scaled-rel.csv` = "Dynamic World + LOESS",
+             #`dynamicworld-loess-s05/predictions-change_stats_scaled-rel.csv` = "Dynamic World + LOESS (a=0.5)",
+             #`dynamicworld/dynamicworld-m10-change_stats_scaled-rel.csv` = "Dynamic World (10% threshold)",
+             #`dynamicworld-bfl/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=72)",
+             #`dynamicworld-bfl-h016/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=0.16)",
+             #`dynamicworld-bfl-harmon1-h016/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=0.16, order=1)",
+             #`dynamicworld-bfl-harmon3-h016/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=0.16, order=3)",
+             #`dynamicworld-bfl-m30-harmon2-h016/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=0.16, mag>30)",
+             `dynamicworld-bfl-m30-trend-h016/predictions-change_stats_scaled-rel.csv` = "Dynamic World + BFL (h=0.16, mag>30, trend)",
+             `summer/mean_predictions-change_stats_scaled-rel.csv` = "Random Forest mean vote",
+             #`summer/median_predictions-change_stats_scaled-rel.csv` = "Random Forest median vote",
+             `summer-loess/mean_predictions-change_stats_scaled-rel.csv` = "RF mean + LOESS",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-change_stats_scaled-rel.csv` = "RF mean + BFL (h=12)",
+             #`summer-bfl-m30-harmon2-scaled-h016-fb/mean-predictions-change_stats_scaled-rel.csv` = "RF mean + BFL (h=0.16)",
+             #`summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions-change_stats_scaled-rel.csv` = "RF median + BFL (h=12)",
+             `summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-change_stats_scaled-rel.csv` = "RF mean + BFL (h=0.16, mag>30, trend)",
+             `summer-bfbaseline-m02-harmon-scaled/mean_predictions-change_stats_scaled-rel.csv` = "RF mean + NDVI BFL",
+             `summer-beast/mean-predictions-change_stats_scaled-rel.csv` = "RF mean + BEAST"
+             #`summer-bfbaseline-m02-harmon-scaled/median_predictions-change_stats_scaled-rel.csv` = "RF median + NDVI BFL"
+             )
+
+VisualiseModelStats(InputDir, InputPattern, ModelMap, main="Per-class pooled yearly change relative accuracy", filename="../../output/2023-04-26-relative-change-accuracy-stats.png")
 
 ## Old method for change accuracy
 

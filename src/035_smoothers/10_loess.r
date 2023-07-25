@@ -5,9 +5,8 @@ source("../utils/covariate-names.r")
 source("../utils/load-sampling-data.r")
 
 # Read in reference and predictions
-RFFile = "../../data/predictions/dynamicworld/dynamicworld.rds"
-#ReferenceFile = "../../data/raw/reference_global_100m_orig&change_year2015-2019_20210407.csv"
-OutFile = "../../data/predictions/dynamicworld-loess-s05/predictions.rds"
+RFFile = "../../data/predictions/summer/mean_predictions.rds"
+OutFile = "../../data/predictions/summer-loess/mean_predictions.rds"
 if (!dir.exists(dirname(OutFile)))
     dir.create(dirname(OutFile))
 
@@ -77,7 +76,7 @@ FitLOESS = function(location_id, scaled=TRUE, plot=FALSE, fallback=FALSE,
 }
 
 # Run the function over all locations and save the result
-LOESSResult = pblapply(unique(RFPredictions$location_id), FitLOESS, scaled=TRUE, fallback=TRUE, span=0.5, cl=10)
+LOESSResult = pblapply(unique(RFPredictions$location_id), FitLOESS, scaled=TRUE, fallback=TRUE, cl=10)
 warnings()
 
 dtypes = sapply(LOESSResult, function(x)class(x))

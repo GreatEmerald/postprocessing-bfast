@@ -5,7 +5,7 @@
 # Output: The same schema, but the predicions are altered based on the BFAST Lite model
 library(sf)
 library(zoo)
-library(bfast)
+library(Rbeast)
 library(pbapply)
 
 source("../utils/utils.r")
@@ -16,7 +16,7 @@ source("../utils/load-sampling-data.r")
 #RFFile = "../../data/predictions/dynamicworld/dynamicworld.rds"
 RFFile = "../../data/predictions/summer/mean_predictions_scaled.rds"
 #ReferenceFile = "../../data/raw/reference_global_100m_orig&change_year2015-2019_20210407.csv"
-OutFile = "../../data/predictions/summer-bfl-m30-trend-scaled-h12-fb/mean-predictions.rds"
+OutFile = "../../data/predictions/summer-beast/mean-predictions.rds"
 if (!dir.exists(dirname(OutFile)))
     dir.create(dirname(OutFile))
 
@@ -33,15 +33,14 @@ RFPredictions = RFPredictions[order(RFPredictions$location_id, RFPredictions$tim
 ScaledPredictions = RFPredictions
 ScaledPredictions[GetCommonClassNames()] = ScalePredictions(ScaledPredictions[GetCommonClassNames()])
 
-# Function for taking a data.frame of a location and producing a BFAST Lite model fit as an output
+# Function for taking a data.frame of a location and producing a Beast model fit as an output
 # location_id is an integer of the location ID of interest
-# ... are bfastlite() parameters
+# ... are beast() parameters
 # fallback=TRUE means that on error, we return unchanged data. Else, we return NA
 # For Landsat 8 data, use start=c(2014, 5), frequency = 365.25/16
 # For Dynamic World, use start=c(2014, 15), frequency=365.25/5
 # Note that the start will not always be correct due to missing data at the beginning, but it does not matter
-FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE,
-    formula=response~trend, h=23, fallback=FALSE,
+FitBeast = function(location_id, scaled=TRUE, plot=FALSE, fallback=FALSE,
     start=c(2014, 5), frequency = 365.25/16,
     ...)
 {
@@ -51,16 +50,6 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE,
     RFSlice = RFSlice[RFSlice$timestamp.x > as.Date("2014-03-18") &
                       RFSlice$timestamp.x < as.Date("2020-07-14"),]
     
-    # If too cloudy, return no prediction
-    if (h > 1 && nrow(RFSlice) < h*2)
-    {
-        if (fallback) return(RFSlice)
-        return(NULL)
-    }
-    #{
-    #    RFSlice[,GetCommonClassNames()] = NA
-    #    return(RFSlice)
-    #}
     
     PointTS = as.zooreg(zoo(RFSlice[, GetCommonClassNames()],
                             RFSlice[, "timestamp.x"]))
@@ -72,26 +61,22 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE,
         #InData[1:23] = NA
         #InData[(length(InData)-23):length(InData)] = NA
         # Run model
-        bfl = try(bfastlite(InData, h=h, formula=formula, ...))
-        if (class(bfl) != "bfastlite") { # If it crashed, don't return any prediction
+        beastpred = try(beast(InData))
+        if (class(beastpred) != "beast" || is.null(beastpred$trend$Y)) { # If it crashed, don't return any prediction
             if (fallback) return(RFSlice)
             return(NULL)
         }
-        # Filter out breaks by magnitude (<20)
-        BreakNo = if (!is.na(bfl$breakpoints$breakpoints[1])) length(bfl$breakpoints$breakpoints) else 0
-        Magnitude=0
-        if (BreakNo > 0)
-        {
-            Magnitude = magnitude(bfl$breakpoints, breaks=BreakNo)$Mag[,"RMSD"]
-            while(min(Magnitude) < mag_threshold && BreakNo > 0)
-            {
-                BreakNo = BreakNo-1
-                Magnitude = if (BreakNo > 0) magnitude(bfl$breakpoints, breaks=BreakNo)$Mag[,"RMSD"] else 0
-            }
-        }
-        Result[,classidx] = as.numeric(fitted(bfl$breakpoints, breaks=BreakNo))
+        beastfit = if(!is.null(beastpred$season$Y)) beastpred$trend$Y + beastpred$season$Y else beastpred$trend$Y
+        
+        if (plot) plot(beastpred$time, beastfit, main=paste(location_id, GetCommonClassNames()[classidx]), type="l")
+        
+        # Remove predictions at NA locations
+        beastfit[is.na(InData)] = NA
+        beastfit = na.omit(beastfit) # TODO: fix case when we have all NAs
+        
+        Result[,classidx] = beastfit
         #Result[is.na(InData),classidx] = NA
-        if (plot) plot(bfl, main=paste(location_id, GetCommonClassNames()[classidx]), sub=paste(round(Magnitude), collapse = ", "), breaks=BreakNo)
+        
     }
     coredata(Result) = as.matrix(ScalePredictions(coredata(Result)))
     RFSlice[,GetCommonClassNames()] = as.data.frame(Result)
@@ -102,9 +87,8 @@ FitBFL = function(location_id, scaled=TRUE, mag_threshold=20, plot=FALSE,
 #FitBFL(sample(RFPredictions$location_id, 1), plot=TRUE) # Takes 15 minutes
 
 # Run the function over all locations and save the result
-BFResult = pblapply(unique(RFPredictions$location_id), FitBFL,
-    scaled=TRUE, mag_threshold=30, formula=response~trend, order=2, fallback=TRUE,
-    h=12, start=c(2014, 5), frequency=365.25/16, cl=10)
+BFResult = pblapply(unique(RFPredictions$location_id), FitBeast,
+    scaled=TRUE, fallback=TRUE, start=c(2014, 5), frequency=365.25/16, cl=10)
 warnings()
     
 dtypes = sapply(BFResult, function(x)class(x))

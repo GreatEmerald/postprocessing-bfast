@@ -20,7 +20,13 @@ ReferenceData = read.csv(ReferenceCSV)
 ReferenceData = RenameReferenceData(ReferenceData)
 ReferenceData = TidyData(ReferenceData)
 
-InputFiles = list.files(InputDir, pattern=glob2rx("*.rds"), recursive = TRUE, full.names = TRUE)
+# If you don't want to aggregate to yearly:
+#InputPostfix = ".rds"
+# If you do:
+InputPostfix = "-val.csv"
+
+InputPattern = glob2rx(paste0("*", InputPostfix))
+InputFiles = list.files(InputDir, pattern=InputPattern, recursive = TRUE, full.names = TRUE)
 
 # Calculate multi-year trends and add their statistics as new columns to the df
 # df can be either reference or prediction chunk of a particular sample_id
@@ -29,6 +35,9 @@ GetTrend = function(df)
 {
     # Figure out whether we have timestamp.x (predictions) or dataYear (reference)
     Time = if (!is.null(df$timestamp.x)) as.Date(df[["timestamp.x"]]) else YearToTOSDate(df[["dataYear"]], df[["subpix_mean_y"]])
+    # If we have "class.x", then rename it to "class"
+    Classes.x = paste0(GetCommonClassNames(), ".x")
+    names(df)[names(df) %in% Classes.x] = substr(names(df)[names(df) %in% Classes.x], 1, nchar(names(df)[names(df) %in% Classes.x])-2)
     Stats = sapply(df[GetCommonClassNames()], CalcTrend, Time)
     # Calculate overall metrics: sum of absolute numbers
     Stats = cbind(Stats, Overall = rowSums(abs(Stats)))
@@ -100,11 +109,12 @@ if (!file.exists(ReferenceTrendOutput))
 # Iterate over all predictions and save the results as CSVs
 GetPredictionTrend = function(InputFile)
 {
-    OutFile = sub("\\.rds$", "-trends.csv", InputFile)
+    OutFile = sub(InputPostfix, "-trends-yearly.csv", InputFile)
     if (file.exists(OutFile))
         return(OutFile)
     
-    Prediction = readRDS(InputFile)
+    Prediction = if (InputPostfix == ".rds")
+        readRDS(InputFile) else read.csv(InputFile)
     
     Results = by(Prediction, as.factor(Prediction[["location_id"]]), GetTrend)
     Results = do.call(rbind, Results)
@@ -117,8 +127,9 @@ PredTrends = pblapply(InputFiles, GetPredictionTrend, cl=12)
 ## Check the correspondence between trends of reference and predictions
 GetTrendStats = function(PredFile)
 {
-    OutFile = sub("\\-trends\\.csv$", "-trend-stats.csv", PredFile)
-    if (file.exists(OutFile))
+    OutFile = sub("\\-trends-yearly\\.csv$", "-trend-stats-yearly.csv", PredFile)
+    OutFileRel = sub("\\-trends-yearly\\.csv$", "-trend-stats-yearly-rel.csv", PredFile)
+    if (file.exists(OutFile) && file.exists(OutFileRel))
         return(OutFile)
     
     PredTrend = read.csv(PredFile)
@@ -130,6 +141,8 @@ GetTrendStats = function(PredFile)
 
     TrendStats = AccuracyStatTable(PredTrend[-1], ValTrend[-1])
     write.csv(TrendStats, OutFile)
+    TrendStatsRel = AccuracyStatTable(PredTrend[-1], ValTrend[-1], relative=TRUE)
+    write.csv(TrendStatsRel, OutFileRel)
     return(OutFile)
 }
 

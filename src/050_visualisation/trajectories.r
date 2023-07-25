@@ -12,20 +12,25 @@ ReferenceData = read.csv(ReferenceCSV)
 ReferenceData = RenameReferenceData(ReferenceData)
 ReferenceData = TidyData(ReferenceData)
 
-DynamicWorld = FlattenGPKG("../../data/WURChange20152019_DynamicWorld_TS.gpkg")
-DynamicWorld = RenameReferenceData(DynamicWorld)
-DynamicWorld = ReclassifyAndScale(DynamicWorld)
+#DynamicWorld = FlattenGPKG("../../data/WURChange20152019_DynamicWorld_TS.gpkg")
+#DynamicWorld = RenameReferenceData(DynamicWorld)
+#DynamicWorld = ReclassifyAndScale(DynamicWorld)
 
 # Load models to plot
 RFPredictions = readRDS("../../data/predictions/summer/mean_predictions_scaled.rds")
-RFMedian = readRDS("../../data/predictions/summer/median_predictions.rds")
-BFBaseline = readRDS("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions.rds")
-BFLPredictions = readRDS("../../data/predictions/summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions.rds")
-DWBFL = readRDS("../../data/predictions/dynamicworld-bfl-h016/predictions.rds")
+#RFMedian = readRDS("../../data/predictions/summer/median_predictions.rds")
+#BFBaseline = readRDS("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions.rds")
+#BFLPredictions = readRDS("../../data/predictions/summer-bfl-m30-harmon2-scaled-h12-fb/median_predictions.rds")
+BFLPredictions = readRDS("../../data/predictions/summer-bfl-m30-trend-scaled-h016-fb/mean-predictions.rds")
+DynamicWorld = readRDS("../../data/predictions/dynamicworld/dynamicworld.rds")
+DWBFL = readRDS("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions.rds")
 
 
-models = list(RFPredictions=RFPredictions, RFMedian=RFMedian, BFBaseline=BFBaseline,
-    BFLMedianPredictions=BFLPredictions, DynamicWorld = DynamicWorld, DWBFL = DWBFL)
+#models = list(RFPredictions=RFPredictions, RFMedian=RFMedian, BFBaseline=BFBaseline,
+#    BFLMedianPredictions=BFLPredictions, DynamicWorld = DynamicWorld, DWBFL = DWBFL)
+
+models = list(RFPredictions=RFPredictions,
+    BFLPredictions=BFLPredictions, DynamicWorld = DynamicWorld, DWBFL = DWBFL)
 
 PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
     legend.pos="left", xlim=c(as.Date("2015-01-01"), as.Date("2020-01-01")),
@@ -45,9 +50,12 @@ PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
     plot(as.formula(paste(classes[1], '~ as.Date(paste0(dataYear, "-01-15"))')), ReferenceData, ylim=c(0,100),
         xlim=xlim, type="b",
         ylab="Land cover fraction (%)", xlab="",
-        main=title, sub=sub)
-    for (classidx in 2:length(classes))
-        points(as.formula(paste(classes[classidx], "~ as.Date(paste0(dataYear, '-01-15'))")), ReferenceData, col=classidx, type="b")
+        main=title, sub=sub, xaxt = "n")
+    axis(1, at = seq(as.Date("2015-01-01"), as.Date("2020-01-01"), "years"), labels=2015:2020)
+    
+    if (length(classes) > 1)
+        for (classidx in 2:length(classes))
+            points(as.formula(paste(classes[classidx], "~ as.Date(paste0(dataYear, '-01-15'))")), ReferenceData, col=classidx, type="b")
     legend(legend.pos, legend=classes, fill=1:length(classes))
     
     # Plot each model
@@ -60,9 +68,13 @@ PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
         plot(as.formula(paste(classes[1], '~ timestamp.x')), model, ylim=c(0,100),
             xlim=xlim, type="l",
             ylab="Land cover fraction (%)", xlab="",
-            main=names(models)[modelidx])
-        for (classidx in 2:length(classes))
-            lines(as.formula(paste(classes[classidx], "~ timestamp.x")), model, col=classidx)
+            main=names(models)[modelidx],
+            xaxt = "n")
+        axis(1, at = seq(as.Date("2015-01-01"), as.Date("2020-01-01"), "years"), labels=2015:2020)
+        
+        if (length(classes) > 1)
+            for (classidx in 2:length(classes))
+                lines(as.formula(paste(classes[classidx], "~ timestamp.x")), model, col=classidx)
     }
     # Save in files
     dev.copy2pdf(file = file.path(PlotOutDir, paste0(Sys.Date(), "-", location_id, "-", sub, ".pdf")))
@@ -82,7 +94,8 @@ GetLocation = function(location_id, invert=FALSE)
 }
 
 # We are interested in point 2996157 - Uruguay eucalyptus plantation, seedlings at March 2018
-PlotTrajectory(2996157, models, classes=c("tree", "shrub", "grassland", "crops"), title="Uruguay eucalyptus")
+PlotTrajectory(2996157, models, classes=c("tree", "shrub", "grassland", "crops"), title="Uruguay eucalyptus", grid=c(2,3))
+PlotTrajectory(2996157, models, classes="grassland", title="Uruguay eucalyptus", grid=c(2,3))
 # Lake Chad, the area is sometimes covered by aquatic plants and sometimes it's water.
 # There was actually no major change here, the semantics are whether it's grassland (covered by plants) or not, which changes seasonally.
 PlotTrajectory(1954894, models, classes=c("water", "grassland"), title = "Lake Chad")
