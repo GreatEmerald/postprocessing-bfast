@@ -39,7 +39,7 @@ GetTrend = function(df)
     Classes.x = paste0(GetCommonClassNames(), ".x")
     names(df)[names(df) %in% Classes.x] = substr(names(df)[names(df) %in% Classes.x], 1, nchar(names(df)[names(df) %in% Classes.x])-2)
     Stats = sapply(df[GetCommonClassNames()], CalcTrend, Time)
-    # Calculate overall metrics: sum of absolute numbers
+    # "Overall" here is sum of absolute numbers, but this results in incorrect ME, so don't use
     Stats = cbind(Stats, Overall = rowSums(abs(Stats)))
     # Flatten everything to one row
     melted = melt(Stats)
@@ -127,11 +127,6 @@ PredTrends = pblapply(InputFiles, GetPredictionTrend, cl=12)
 ## Check the correspondence between trends of reference and predictions
 GetTrendStats = function(PredFile)
 {
-    OutFile = sub("\\-trends-yearly\\.csv$", "-trend-stats-yearly.csv", PredFile)
-    OutFileRel = sub("\\-trends-yearly\\.csv$", "-trend-stats-yearly-rel.csv", PredFile)
-    if (file.exists(OutFile) && file.exists(OutFileRel))
-        return(OutFile)
-    
     PredTrend = read.csv(PredFile)
     # Match IDs
     CommonIDs = intersect(PredTrend[["location_id"]], ValTrends[["location_id"]])
@@ -139,11 +134,22 @@ GetTrendStats = function(PredFile)
     ValTrend = ValTrends[ValTrends$location_id %in% CommonIDs,]
     stopifnot(all(PredTrend[["location_id"]] == ValTrend[["location_id"]]))
 
-    TrendStats = AccuracyStatTable(PredTrend[-1], ValTrend[-1])
-    write.csv(TrendStats, OutFile)
-    TrendStatsRel = AccuracyStatTable(PredTrend[-1], ValTrend[-1], relative=TRUE)
-    write.csv(TrendStatsRel, OutFileRel)
-    return(OutFile)
+    for (Stat in c("ChangeTrend", "ChangeTotal", "ChangeRMSD", "ChangeMAD"))
+    {
+        OutFile = sub("\\-trends-yearly\\.csv$", paste0("-trend-stats-yearly-", Stat, ".csv"), PredFile)
+        OutFileRel = sub("\\-trends-yearly\\.csv$", paste0("-trend-stats-yearly-", Stat, "-rel.csv"), PredFile)
+        
+        if (file.exists(OutFile) && file.exists(OutFileRel))
+            next
+        
+        # Select only the columns with the stat of interest
+        Columns = grep("Overall", grep(Stat, names(PredTrend), value=TRUE), invert=TRUE, value=TRUE)
+        
+        TrendStats = AccuracyStatTable(PredTrend[Columns], ValTrend[Columns])
+        write.csv(TrendStats, OutFile)
+        TrendStatsRel = AccuracyStatTable(PredTrend[Columns], ValTrend[Columns], relative=TRUE)
+        write.csv(TrendStatsRel, OutFileRel)
+    }
 }
 
 PredStats = pblapply(PredTrends, GetTrendStats, cl=12)
