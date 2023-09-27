@@ -100,11 +100,14 @@ GetTransitionMatrices = function(InputFile, interactive=FALSE, diff=FALSE, relat
     }
 
     PredPlot = ggplot(PredDF, aes_string(paste0("`To ", EndYear, "`"), paste0("`From ", StartYear, "`"), fill=paste0("`", LegendName, "`"))) +
-        geom_tile() + sc + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) + ggtitle("Prediction")
+        geom_tile() + sc + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) +
+        ggtitle("Prediction") + scale_y_discrete(limits=rev)
     RefPlot  = ggplot(ValDF, aes_string(paste0("`To ", EndYear, "`"), paste0("`From ", StartYear, "`"), fill=paste0("`", LegendName, "`"))) +
-        geom_tile() + sc + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) + ggtitle("Reference")
+        geom_tile() + sc + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) +
+        ggtitle("Reference") + scale_y_discrete(limits=rev)
     DiffPlot  = ggplot(DiffDF, aes_string(paste0("`To ", EndYear, "`"), paste0("`From ", StartYear, "`"), fill=paste0("`", LegendName, "`"))) +
-        geom_tile() + scDiff + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) + ggtitle("Error")
+        geom_tile() + scDiff + geom_text(aes(label=if (relative) round(`Area (%)`, 2) else round(`Fraction sum`))) +
+        ggtitle("Error") + scale_y_discrete(limits=rev)
     if (!interactive)
     {
         # grid.arrange(PredPlot, RefPlot) # To visualise it
@@ -137,11 +140,20 @@ ggsave("../../output/2023-08-04-change-matrices.pdf", width=11, height=4.2)
 
 RFPlot = GetTransitionMatrices(RFFile, TRUE, relative=TRUE)
 BFPlot = GetTransitionMatrices(BFASTFile, TRUE, relative=TRUE)
+DWPlot = GetTransitionMatrices(DWFile, TRUE, relative=TRUE)
+DWBFPlot = GetTransitionMatrices(DWBFFile, TRUE, relative=TRUE)
 
 Legend = get_legend(RFPlot[[1]])
-ggdraw(plot_grid(plot_grid(RFPlot[[2]] + theme(legend.position='none'), RFPlot[[1]] + theme(legend.position='none') + ggtitle("Random Forest regression"), ncol=1),
-                 plot_grid(Legend, BFPlot[[1]] + theme(legend.position='none') + ggtitle("Random Forest + BFAST Lite"), ncol=1)))
-ggsave("../../output/2023-08-04-change-matrices-relative.pdf", width=11, height=4.2)
+ggdraw(plot_grid(plot_grid(RFPlot[[2]] + theme(legend.position='none'),
+        RFPlot[[1]] + theme(legend.position='none') + ggtitle("Random Forest regression"),
+        DWPlot[[1]] + theme(legend.position='none') + ggtitle("Dynamic World"),
+        ncol=1),
+    plot_grid(Legend,
+        BFPlot[[1]] + theme(legend.position='none') + ggtitle("Random Forest + BFAST Lite"),
+        DWBFPlot[[1]] + theme(legend.position='none') + ggtitle("Dynamic World + BFAST Lite"),
+        ncol=1)
+    ))
+ggsave("../../output/2023-09-27-change-matrices-relative.pdf", width=11.2, height=5.95)
 
 DWPlot = GetTransitionMatrices(DWFile, TRUE)
 DWBFPlot = GetTransitionMatrices(DWBFFile, TRUE)

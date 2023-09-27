@@ -16,8 +16,10 @@ source("../utils/covariate-names.r")
 # Statistics: character vector of column names to visualise, NULL means all
 # main: the title
 # filename: file to save it to
+# plot: whether to plot the result, or to return the table before plotting
 VisualiseModelStats = function(InputDir=NULL, InputPattern=NULL, InputFiles=NULL,
-    ModelMap, RemovePattern="\\..", Statistics=NULL, main="", filename="", xlab="Class")
+    ModelMap, RemovePattern="\\..", Statistics=NULL, main="", filename="",
+    xlab="Class", plot=TRUE)
 {
     if (is.null(InputFiles))
         InputFiles = list.files(InputDir, pattern=InputPattern, recursive = TRUE, full.names = TRUE)
@@ -49,18 +51,29 @@ VisualiseModelStats = function(InputDir=NULL, InputPattern=NULL, InputFiles=NULL
     # Order as given
     StatTable$model = ordered(StatTable$model, levels=ModelMap)
     
-    # Plot
-    Plot = ggplot(StatTable, aes(x=X, y=Error, fill=model)) +
-        geom_bar(stat="identity", position="dodge", width=0.8) +
-        scale_fill_brewer(palette="Set1") +
-        facet_wrap(~Statistic) +
-        ggtitle(main) +
-        xlab("Class") +
-        #theme_dark() +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-    print(Plot)
-    if (filename != "")
-        ggsave(filename)
-    
-    return(Plot)
+    if (plot)
+    {
+        # Plot
+        Plot = ggplot(StatTable, aes(x=X, y=Error, fill=model)) +
+            geom_bar(stat="identity", position="dodge", width=0.8) +
+            scale_fill_brewer(palette="Set1") +
+            facet_wrap(~Statistic) +
+            ggtitle(main) +
+            xlab("Class") +
+            #theme_dark() +
+            theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+        print(Plot)
+        if (filename != "")
+            ggsave(filename)
+        
+        return(Plot)
+    }
+    return(StatTable)
 }
+
+# Palette for models
+
+# Blues are DW, greens are LOESS/BEST, reds are BFAST Lite
+ModelPalette = c("Dynamic World" = "#0000FF", "Dynamic World + LOESS" = "#00AAFF", "Dynamic World + BFAST Lite" = "#AA00FF",
+                "Random Forest regression" = "#000000", "Random Forest + LOESS" = "#00FF00", "Random Forest + BFAST Lite" = "#FF0000",
+                "RF + NDVI-only BFAST Lite" = "#880000", "Random Forest + BEAST" = "#008800", "Reference" = "#000088")

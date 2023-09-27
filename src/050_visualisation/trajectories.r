@@ -174,6 +174,150 @@ PlotTrajectory(2187224, models, classes=c("water", "grassland", "shrub", "crops"
 GetLocation(2187489)
 PlotTrajectory(2187489, models, classes=c("water", "grassland", "bare", "crops"), title="Eyasi lake", grid=c(2,3))
 
+# Check examples of change
+ChangeData = read.csv("../../data/reference-trends.csv")
+ChangeIDs = ChangeData[ChangeData["ChangeTotal.Overall"] > 0, "location_id"]
+
+ChangeID = 2806410 # 2806410 Australian seasonal lake
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "grassland", "shrub", "crops")) # Water class is a good candidate
+
+ChangeID = 1997679 # 1997679 Russian selective logging
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "grassland", "tree", "shrub")) # Trees are a great example, but BEAST failed
+
+ChangeID = 2804962 # ! Dominica shallow lake
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "grassland", "shrub", "crops")) # Water is a good example, NDVI works best here
+
+ChangeID = 2807107 # ! 2807107 Australia desert river meander
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "bare", "grassland", "shrub")) # Bare is a good example, but all models behave similarly
+
+ChangeID = 2804358 # !! 2804358 Kazakh reservoir wetlands
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "bare", "grassland", "shrub")) # Water is a good example, but RF+BFL falls behind a bit
+
+(ChangeID = sample(ChangeIDs, 1)) # 2996877 Australia desert river meander again
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "bare", "grassland", "shrub")) # All models are relatively poor here
+
+(ChangeID = 2996360) # ! 2996360 Ethiopia dam reservoir
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "bare", "grassland", "shrub", "crops")) # Water is good, but BFL does worse due to an outlier
+
+(ChangeID = sample(ChangeIDs, 1)) # 1954291 Algeria agriculture
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "shrub", "grassland", "crops")) # Barely any change
+
+(ChangeID = sample(ChangeIDs, 1)) # 2131014 Chile tree planation
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("shrub", "bare", "tree", "grassland", "crops")) # Trees are an interesting example, but no BEAST
+
+(ChangeID = sample(ChangeIDs, 1)) # 2996822 Lake Muirhead, seasonal lake in Australia
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "crops", "grassland", "water")) # Mixed, can't tell
+
+(ChangeID = sample(ChangeIDs, 1)) # 2806353 Australian savannah on fire in 2015
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "crops", "tree", "grassland", "shrub")) # Trees are interesting, but little change
+
+(ChangeID = sample(ChangeIDs, 1)) # 2809210 Californian tree plantation
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "crops", "tree", "grassland", "shrub")) # Little change
+
+(ChangeID = sample(ChangeIDs, 1)) # 2804906 Eucalyptus plantation
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "crops", "tree", "grassland", "shrub")) # Trees are very interesting, but no BEAST
+
+(ChangeID = sample(ChangeIDs, 1)) # 2809349 Huanghe floodplain, very confusing
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("bare", "crops", "grassland", "water", "shrub")) # Reference is also confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2807105 Australian rivers return
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("water", "bare", "grassland", "shrub")) # Irrigation event, bare is good but no BEAST
+
+(ChangeID = sample(ChangeIDs, 1)) # 1972119 No change Spain agriculture
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "shrub")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2802895 Australia browning
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "shrub")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2806137 Mongolian desert, no change
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "shrub")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2808959 Spain lake dynamics
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "water")) # Water is interesting, but no BEAST
+
+(ChangeID = sample(ChangeIDs, 1)) # 2806124 Russian drying lake
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "water")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2997637 Moscow lake, no change
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "water")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2806159 Seasonal river in China
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "water")) # Confusing
+
+(ChangeID = 2805465) # !! 2805465 Iraq salt lake
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "water")) # Nice example of water, though ground truth is rather unclear
+
+(ChangeID = sample(ChangeIDs, 1)) # 1972554 Italy agriculture, no change but tree loss
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "crops")) # No big change
+
+(ChangeID = sample(ChangeIDs, 1)) # 2996044 Eucalyptus again
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "crops", "shrub")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2807098 Australian seasonal lake again
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "water", "shrub")) # Confusing
+
+(ChangeID = sample(ChangeIDs, 1)) # 2805303 Indus river meander
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "water")) # Confusing, including the reference
+
+(ChangeID = 2806156) # ! 2806156 No change agriculture
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "water")) # Water is a good example, though the reference is odd
+
+(ChangeID = sample(ChangeIDs, 1)) # 2809103 Canadian agriculture/grass near a mine, snowy in winter
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "shrub")) # Confusing
+
+(ChangeID = 2997037) # !! 2997037 Spain forest fire in 2018
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub")) # Trees are interesting, though BFL oversmooths a bit here
+
+(ChangeID = sample(ChangeIDs, 1)) # 1954403 Morocco seasonal variation
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub")) # No change
+
+(ChangeID = sample(ChangeIDs, 1)) # 2997216 China terrace agriculture in 2018 (in the neighbourhood)
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "shrub")) # No change
+
+(ChangeID = 2996889) # 2996889 Australia drying lake
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("crops", "bare", "grassland", "water", "shrub")) # Water is good example, BFL oversmooths again
+
+(ChangeID = 2808606) # 2808606 Australia fire in 2019
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub")) # Trees are an intersting example, but not very clear
+
+(ChangeID = sample(ChangeIDs, 1)) # 1953958 Africa deforestation to smallholder agriculture
+GetLocation(ChangeID)
+PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub", "crops")) # Confusing
+
 
 # Make a plot of a single class
 
@@ -216,7 +360,7 @@ PlotClass = function(location_id, models, class="urban_built_up",
     Cols = Cols[c(5,1:4,6:length(Cols))]
         
     Output = ggplot(PlotData, aes(Date, Fraction, group=Model)) + geom_line(aes(colour=Model, linewidth=Model)) +
-        scale_colour_manual(values=Cols) +
+        scale_colour_manual(values=ModelPalette) +
         scale_x_date(date_breaks="1 year", limits=xlim) +
         scale_linewidth_manual(values=c(1.5, rep(0.5, length(models))))
        # geom_point()
@@ -236,3 +380,5 @@ PlotClass = function(location_id, models, class="urban_built_up",
 }
 
 PlotClass(1971773, models, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Built-up class fraction in a suburban area of Kingswood, Bristol, UK")
+PlotClass(2804358, models, "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan")
+

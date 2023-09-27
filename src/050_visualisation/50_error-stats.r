@@ -21,7 +21,8 @@ ModelMap = c(`dynamicworld/dynamicworld-static-stats.csv` = "Dynamic World",
              `summer-beast/mean-predictions-static-stats.csv` = "Random Forest + BEAST"
              )
 
-MapError = VisualiseModelStats(InputFiles=InputFiles, ModelMap = ModelMap, main="", Statistics=c("MAE", "ME"))
+MapErrorTable = VisualiseModelStats(InputFiles=InputFiles, ModelMap = ModelMap, main="", Statistics=c("MAE", "ME"), plot=FALSE)
+MapErrorTable[["Error type"]] = "Map error"
 
 ## Change accuracy
 
@@ -39,7 +40,8 @@ ModelMap = c(`dynamicworld/dynamicworld-change_stats_scaled.csv` = "Dynamic Worl
              `summer-beast/mean-predictions-change_stats_scaled.csv` = "Random Forest + BEAST"
              )
 
-ChangeError = VisualiseModelStats(InputDir, InputPattern, ModelMap = ModelMap, main="",  Statistics=c("MAE", "ME"))
+ChangeError = VisualiseModelStats(InputDir, InputPattern, ModelMap = ModelMap, main="",  Statistics=c("MAE", "ME"), plot=FALSE)
+ChangeError[["Error type"]] = "Change error"
 
 ## Trend error
 
@@ -61,7 +63,8 @@ ModelMap = c(`dynamicworld/dynamicworld-trend-stats-yearly-ChangeTrend.csv` = "D
              `summer-beast/mean-predictions-trend-stats-yearly-ChangeTrend.csv` = "Random Forest + BEAST"
              )
 
-TrendError = VisualiseModelStats(InputFiles=InputFiles, ModelMap=ModelMap, main="", RemovePattern="ChangeTrend\\.",  Statistics=c("MAE", "ME"))
+TrendError = VisualiseModelStats(InputFiles=InputFiles, ModelMap=ModelMap, main="", RemovePattern="ChangeTrend\\.",  Statistics=c("MAE", "ME"), plot=FALSE)
+TrendError[["Error type"]] = "Trend error"
 
 ## Variability error
 
@@ -81,11 +84,26 @@ ModelMap = c(`dynamicworld/dynamicworld-trend-stats-yearly-ChangeRMSD.csv` = "Dy
              `summer-beast/mean-predictions-trend-stats-yearly-ChangeRMSD.csv` = "Random Forest + BEAST"
              )
 
-VariabilityError = VisualiseModelStats(InputFiles=InputFiles, ModelMap=ModelMap, main="", RemovePattern="ChangeRMSD\\.", Statistics=c("MAE", "ME"))
+VariabilityError = VisualiseModelStats(InputFiles=InputFiles, ModelMap=ModelMap, main="", RemovePattern="ChangeRMSD\\.", Statistics=c("MAE", "ME"), plot=FALSE)
+VariabilityError[["Error type"]] = "Variability error"
 
 ## Combine into one
 
-pdf("../../output/2023-07-27-erors.pdf", 12.8, 9.06)
+ErrorTable = rbind(MapErrorTable, ChangeError, TrendError, VariabilityError)
+ErrorTable[["Error type"]] = factor(ErrorTable[["Error type"]], levels=unique(ErrorTable[["Error type"]]))
+
+ggplot(ErrorTable, aes(x=X, y=Error, fill=model)) +
+            geom_bar(stat="identity", position="dodge", width=0.8) +
+            scale_fill_manual(values=ModelPalette) +
+            facet_grid(vars(`Error type`), vars(Statistic), "free_y") +
+            xlab("Class") +
+            #theme_dark() +
+            theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+                legend.position="bottom")
+
+ggsave("../../output/2023-09-26-erors.pdf", width=8.61, height=5.81)
+                
+pdf("../../output/2023-09-26-erors.pdf", 12.8, 9.06)
 grid.newpage()
 Combination = grid.draw(rbind(ggplotGrob(MapError), ggplotGrob(ChangeError), ggplotGrob(TrendError), ggplotGrob(VariabilityError), size = "max"))
 dev.off()
