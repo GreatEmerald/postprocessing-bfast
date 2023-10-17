@@ -42,6 +42,7 @@ PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
 {
     # Filter all data to the location id
     ReferenceData = ReferenceData[ReferenceData$location_id == location_id,]
+    if (nrow(ReferenceData) < 1) stop("Location not found in the reference data!")
     sub = title
     title = paste("Reference data for location ", location_id)
     
@@ -318,10 +319,28 @@ PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub")
 GetLocation(ChangeID)
 PlotTrajectory(ChangeID, models, classes=c("tree", "bare", "grassland", "shrub", "crops")) # Confusing
 
+## Nandika's points
+# Ethiopia dam
+ChangeID = 2996360
+PlotTrajectory(ChangeID, models, classes=c("water", "tree", "grassland", "crops")) # OK, but the break is smoothed away by RF. NDVI works best
+ChangeID = 2802242
+PlotTrajectory(ChangeID, models, classes=c("water", "tree", "grassland", "crops")) # BEAST doesn't work and it's not very similar to reference
+
+# Australia vineyard
+ChangeID = 2802793
+PlotTrajectory(ChangeID, models, classes=c("bare", "tree", "grassland", "crops")) # ! Nice example, but no BEAST
+
+# Peru water
+ChangeID = 2996093
+PlotTrajectory(ChangeID, models, classes=c("bare", "water", "grassland", "crops")) # No change water according to predictions
+# Peru crops
+ChangeID = 2804927
+PlotTrajectory(ChangeID, models, classes=c("bare", "shrub", "grassland", "crops")) # Erratic time series
+# Peru shrub
+ChangeID = 2804915
+PlotTrajectory(ChangeID, models, classes=c("bare", "shrub", "grassland", "crops")) # Gradual change, interestingly DW is pretty good here, but RF and BEAST fail
 
 # Make a plot of a single class
-
-
 PlotClass = function(location_id, models, class="urban_built_up",
     xlim=c(as.Date("2015-01-01"), as.Date("2020-01-01")),
     title="", size=dev.size())
@@ -362,7 +381,8 @@ PlotClass = function(location_id, models, class="urban_built_up",
     Output = ggplot(PlotData, aes(Date, Fraction, group=Model)) + geom_line(aes(colour=Model, linewidth=Model)) +
         scale_colour_manual(values=ModelPalette) +
         scale_x_date(date_breaks="1 year", limits=xlim) +
-        scale_linewidth_manual(values=c(1.5, rep(0.5, length(models))))
+        scale_linewidth_manual(values=c(1.5, rep(0.5, length(models)))) +
+        ylab(paste("Fraction of", PrettifyNames(class)))
        # geom_point()
         
     
@@ -380,5 +400,6 @@ PlotClass = function(location_id, models, class="urban_built_up",
 }
 
 PlotClass(1971773, models, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Built-up class fraction in a suburban area of Kingswood, Bristol, UK")
-PlotClass(2804358, models, "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan")
+PlotClass(2804358, models[1:3], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Dynamic World)")
+PlotClass(2804358, models[4:7], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Random Forest)")
 
