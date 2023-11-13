@@ -4,6 +4,7 @@ library(ggplot2)
 
 source("../utils/load-sampling-data.r")
 source("../utils/covariate-names.r")
+source("utils.r")
 
 # Load validation data
 ReferenceCSV = "../../data/raw/reference_global_100m_orig&change_year2015-2019_20210407.csv"
@@ -382,7 +383,8 @@ PlotClass = function(location_id, models, class="urban_built_up",
         scale_colour_manual(values=ModelPalette) +
         scale_x_date(date_breaks="1 year", limits=xlim) +
         scale_linewidth_manual(values=c(1.5, rep(0.5, length(models)))) +
-        ylab(paste("Fraction of", PrettifyNames(class)))
+        ylab(paste("Fraction of", PrettifyNames(class))) +
+        theme(legend.position="bottom")
        # geom_point()
         
     
@@ -399,7 +401,11 @@ PlotClass = function(location_id, models, class="urban_built_up",
     return(Output)
 }
 
-PlotClass(1971773, models, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Built-up class fraction in a suburban area of Kingswood, Bristol, UK")
-PlotClass(2804358, models[1:3], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Dynamic World)")
-PlotClass(2804358, models[4:7], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Random Forest)")
+Bristol = PlotClass(1971773, models, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Built-up class fraction in a suburban area of Kingswood, Bristol, UK")
+Kazakhstan1 = PlotClass(2804358, models[1:3], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Dynamic World)")
+Kazakhstan2 = PlotClass(2804358, models[4:7], "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), title="Water change in Kapshagay reservoir, delta of river Ile, Kazakhstan (Random Forest)")
 
+Legend = get_legend(Bristol)
+
+ggdraw(plot_grid(Bristol + theme(legend.position='none'), Kazakhstan1 + theme(legend.position='none'), Kazakhstan2 + theme(legend.position='none'), Legend, ncol=1, rel_heights = c(2,2,2,1)))
+ggsave("../../output/2023-11-02-model-timeseries.pdf", width=8.11, height=10.2)
