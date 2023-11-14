@@ -1,6 +1,9 @@
 # Load the harmonised predictions of two sets, a reference and testee, and test
 # whether the testee is significantly different from the reference.
 # This is testing the residuals, so we also use the reference data.
+#library(lme4)
+library(lmerTest)
+library(multcomp)
 
 source("../utils/covariate-names.r")
 
@@ -29,14 +32,16 @@ GetResidualTables = function(InputDFs)
     
     DFSizes2 = sapply(FilteredDFs, nrow)
     #print(c("DF sizes after:", DFSizes2))
-    print(c("DF size change:", DFSizes2-DFSizes))
+    print(c("DF size change (check if not 0):", DFSizes2-DFSizes))
     
-    OutputDFs = lapply(FilteredDFs, function(x) x[paste0(Classes,".x")] - x[paste0(Classes,".y")])
+    # Calculate residuals and keep location id (as factor)
+    OutputDFs = lapply(FilteredDFs, function(x) cbind(abs(x[paste0(Classes,".x")] - x[paste0(Classes,".y")]), location_id = as.factor(x[["location_id"]])))
+    names(OutputDFs) = names(InputDFs)
     
     return(OutputDFs)
 }
 
-ResTables = GetResidualTables(list(Reference, Testee))
+ResTables = GetResidualTables(list(Reference=Reference, Testee=Testee))
 ReferenceResiduals = ResTables[[1]]
 TesteeResiduals = ResTables[[2]]
 
@@ -123,10 +128,69 @@ SignificanceTest(GetChangeResidualTable(Reference), GetChangeResidualTable(Teste
 ## ANOVA & Tukey HSD
 # We have three factors: model, class, and location id.
 
-ANOVAtable = rbind(data.frame(Value = abs(unlist(ReferenceResiduals)), Model="Reference", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))),
-    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))))
-summary(aov(Value ~ Model + Error(id), ANOVAtable))
+#ANOVAtable = rbind(data.frame(Value = abs(unlist(ReferenceResiduals)), Model="Reference", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))),
+#    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))))
+    
+#ANOVAtable = rbind(data.frame(Value = abs(unlist(ReferenceResiduals)), Model="Reference", id=factor(1:(nrow(ReferenceResiduals)))),
+#    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=factor(1:(nrow(TesteeResiduals)))))
+#head(table(ANOVAtable$id))
 
+ANOVAlist = lapply(ResTables, reshape2::melt, variable.name="Class", id.vars="location_id")
+
+
+Ref = abs(ReferenceResiduals)
+Tes = abs(TesteeResiduals)
+Ref$id = 1:nrow(Ref)
+Tes$id = 1:nrow(Tes)
+ANOVAtable = rbind(cbind(reshape2::melt(Ref, variable.name="Class", id.vars="id"), Model="Reference"),
+                   cbind(reshape2::melt(Tes, variable.name="Class", id.vars="id"), Model="Testee"))
+ANOVAtable$id = as.factor(ANOVAtable$id)
+ANOVAtable$Model = as.factor(ANOVAtable$Model)
+
+#summary(aov(Value ~ Model + Error(factor(id)), ANOVAtable)) # CRASH
+AOVmodel = lmer(value ~ Model + (1 | Class/id), data=ANOVAtable) # Completes within seconds
+
+t.test(abs(unlist(ReferenceResiduals)), abs(unlist(TesteeResiduals)), paired=TRUE) # p-value = 0.08352, t = 1.7306, df = 1071993,
+
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+
+# test
+Ref = head(ReferenceResiduals)
+Tes = head(TesteeResiduals)
+
+Ref = abs(Ref)
+Tes = abs(Tes)
+Ref$id = 1:6
+Tes$id = 1:6
+ANOVAtable = rbind(cbind(reshape2::melt(Ref, variable.name="Class", id.vars="id"), Model="Reference"),
+                   cbind(reshape2::melt(Tes, variable.name="Class", id.vars="id"), Model="Testee"))
+ANOVAtable$id = as.factor(ANOVAtable$id)
+ANOVAtable$Model = as.factor(ANOVAtable$Model)
+
+t.test(abs(unlist(Ref[1])), abs(unlist(Tes[1])), paired=TRUE)
+AOVmodel = lmer(value ~ Model + (1 | id) + (1 | Class), data=ANOVAtable)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+
+AOVmodel = lmer(value ~ Model + (1 | id), data=ANOVAtable)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+
+AOVmodel = lmer(value ~ Model + (1 | Class), data=ANOVAtable)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+
+t.test(abs(unlist(Ref[1:7])), abs(unlist(Tes[1:7])), paired=TRUE) # Pair all observations regardless of class
+AOVmodel = lmer(value ~ Model + (1 | Class/id), data=ANOVAtable) # Same as the paired t-test above
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+                   
 # Input: list of residuals from a particular group
 ANOVATest = function(ModelList)
 {
