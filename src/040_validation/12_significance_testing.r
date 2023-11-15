@@ -4,6 +4,8 @@
 #library(lme4)
 library(lmerTest)
 library(multcomp)
+library(future)
+plan("multicore")
 
 source("../utils/covariate-names.r")
 
@@ -27,15 +29,19 @@ GetResidualTables = function(InputDFs)
     FilteredDFs = lapply(InputDFs, function(x) x[x$location_id %in% CommonIDs,])
     
     # Make sure the tables align
-    IDmatch = Reduce(all.equal, lapply(FilteredDFs, function(x) x[["location_id"]]))
-    stopifnot(all(IDmatch))
+    locations = lapply(FilteredDFs, function(x) x[["location_id"]])
+    stopifnot(all(duplicated(locations)[-1]))
     
     DFSizes2 = sapply(FilteredDFs, nrow)
     #print(c("DF sizes after:", DFSizes2))
     print(c("DF size change (check if not 0):", DFSizes2-DFSizes))
     
-    # Calculate residuals and keep location id (as factor)
-    OutputDFs = lapply(FilteredDFs, function(x) cbind(abs(x[paste0(Classes,".x")] - x[paste0(Classes,".y")]), location_id = as.factor(x[["location_id"]])))
+    # Calculate residuals and keep location id and dataYear (as factors)
+    OutputDFs = lapply(FilteredDFs, function(x) cbind(
+        abs(x[paste0(Classes,".x")] - x[paste0(Classes,".y")]),
+        location_id = as.factor(x[["location_id"]]),
+        dataYear = as.factor(x[["dataYear"]])
+    ))
     names(OutputDFs) = names(InputDFs)
     
     return(OutputDFs)
@@ -135,8 +141,68 @@ SignificanceTest(GetChangeResidualTable(Reference), GetChangeResidualTable(Teste
 #    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=factor(1:(nrow(TesteeResiduals)))))
 #head(table(ANOVAtable$id))
 
-ANOVAlist = lapply(ResTables, reshape2::melt, variable.name="Class", id.vars="location_id")
+GetANOVATable = function(ResTables)
+{
+    ANOVAlist = lapply(ResTables, reshape2::melt, variable.name="Class", id.vars=c("location_id", "dataYear"))
+    ANOVAlist = lapply(1:length(ANOVAlist), function(x){
+        ANOVAlist[[x]][["Model"]] = names(ANOVAlist)[x]
+        return(ANOVAlist[[x]])
+    })
+    ANOVAtable = do.call(rbind, ANOVAlist)
+    ANOVAtable[["Model"]] = as.factor(ANOVAtable[["Model"]])
 
+    return(ANOVAtable)
+}
+ANOVAtable = GetANOVATable(ResTables)
+AOVmodel = lmer(value ~ Model + (1 | Class/location_id/dataYear), data=ANOVAtable)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+
+## Run tests
+# RF models
+RFTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-val.csv"),
+    "Random Forest + LOESS" = read.csv("../../data/predictions/summer-loess/mean_predictions-val.csv"),
+    "Random Forest + BFAST Lite" = read.csv("../../data/predictions/summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-val.csv"),
+    "RF + NDVI-only BFAST Lite" = read.csv("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions-val.csv"),
+    "Random Forest + BEAST" = read.csv("../../data/predictions/summer-beast/mean-predictions-val.csv")
+))
+ANOVAtable = GetANOVATable(RFTables)
+AOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=ANOVAtable))
+RFAOVmodel = value(AOVfuture)
+anova(RFAOVmodel)
+summary(RFAOVmodel)
+summary(glht(RFAOVmodel, linfct = mcp(Model = "Tukey")))
+
+# DW models
+DWTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-val.csv"),
+    "Dynamic World + LOESS" = read.csv("../../data/predictions/dynamicworld-loess/predictions-val.csv"),
+    "Dynamic World + BFAST Lite" = read.csv("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions-val.csv")
+))
+DWANOVAtable = GetANOVATable(DWTables)
+DWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=DWANOVAtable))
+AOVmodel = value(DWAOVfuture)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF vs DF
+
+RFDWTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-val.csv"),
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-val.csv")
+))
+DWANOVAtable = GetANOVATable(RFDWTables)
+DWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=DWANOVAtable))
+AOVmodel = value(DWAOVfuture)
+anova(AOVmodel)
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+## TEST
 
 Ref = abs(ReferenceResiduals)
 Tes = abs(TesteeResiduals)
@@ -155,6 +221,8 @@ t.test(abs(unlist(ReferenceResiduals)), abs(unlist(TesteeResiduals)), paired=TRU
 anova(AOVmodel)
 summary(AOVmodel)
 summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+
+
 
 # test
 Ref = head(ReferenceResiduals)
