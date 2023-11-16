@@ -9,47 +9,63 @@ plan("multicore")
 
 source("../utils/covariate-names.r")
 
-## For yearly maps, simple
-
-ReferencePredictions = "../../data/predictions/summer/mean_predictions_scaled-val.csv"
-TesteePredictions = "../../data/predictions/summer-bfl-m30-harmon2-scaled-h12-fb/mean_predictions-val.csv"
-
 Classes = GetCommonClassNames()
-Reference = read.csv(ReferencePredictions)
-Testee = read.csv(TesteePredictions)
 
 # Keep only common locations between all entries and produce residual tables
 # Input is list of data.frames to preprocess
-GetResidualTables = function(InputDFs)
+# YearVar is the year variable, "dataYear" for regular errors and "Years" for change, NULL to copy location_id
+# For trends: the reference file is separate, and we need to select a variable to check (VarName.Class)
+GetResidualTables = function(InputDFs, YearVar="dataYear", VarName=NULL)
 {
+    # Create a joint ID for year and location for each DF
+    InputDFs = lapply(InputDFs, function(x) {
+        if (is.null(VarName))
+        {
+            stopifnot(YearVar %in% names(x))
+            x[["location_year"]] = paste0(x[["location_id"]], x[[YearVar]])
+        } else x[["location_year"]] = x[["location_id"]]
+        return(x)
+    })
+    
     # Drop rows that don't match (if any)
-    CommonIDs = Reduce(intersect, lapply(InputDFs, function(x) x[["location_id"]]))
+    CommonIDs = Reduce(intersect, lapply(InputDFs, function(x) x[["location_year"]]))
     DFSizes = sapply(InputDFs, nrow)
     #print(c("DF sizes before:", DFSizes))
-    FilteredDFs = lapply(InputDFs, function(x) x[x$location_id %in% CommonIDs,])
+    FilteredDFs = lapply(InputDFs, function(x) x[x$location_year %in% CommonIDs,])
     
     # Make sure the tables align
-    locations = lapply(FilteredDFs, function(x) x[["location_id"]])
+    locations = lapply(FilteredDFs, function(x) x[["location_year"]])
     stopifnot(all(duplicated(locations)[-1]))
     
     DFSizes2 = sapply(FilteredDFs, nrow)
     #print(c("DF sizes after:", DFSizes2))
     print(c("DF size change (check if not 0):", DFSizes2-DFSizes))
     
-    # Calculate residuals and keep location id and dataYear (as factors)
-    OutputDFs = lapply(FilteredDFs, function(x) cbind(
-        abs(x[paste0(Classes,".x")] - x[paste0(Classes,".y")]),
-        location_id = as.factor(x[["location_id"]]),
-        dataYear = as.factor(x[["dataYear"]])
-    ))
+    if (!is.null(VarName))
+    {
+        ReferenceTable = read.csv("../../data/reference-trends.csv")
+        ReferenceTable = ReferenceTable[ReferenceTable$location_id %in% CommonIDs,]
+    }
+        
+    # Calculate residuals and keep location_year (as factor)
+    OutputDFs = lapply(FilteredDFs, function(x) {
+        if (!is.null(VarName)) # Trends
+        {
+            Prediction = x[paste0(VarName, ".", Classes)]
+            Reference = ReferenceTable[paste0(VarName, ".", Classes)]
+        } else { # Map and static errors
+            Prediction = x[paste0(Classes,".x")]
+            Reference = x[paste0(Classes,".y")]
+        }
+        cbind(
+            abs(Prediction - Reference),
+            location_year = as.factor(x[["location_year"]])
+        )
+    })
     names(OutputDFs) = names(InputDFs)
     
     return(OutputDFs)
 }
-
-ResTables = GetResidualTables(list(Reference=Reference, Testee=Testee))
-ReferenceResiduals = ResTables[[1]]
-TesteeResiduals = ResTables[[2]]
 
 # Diagnostics - skip in production
 if (FALSE) {
@@ -91,9 +107,8 @@ SignificanceTest = function(ReferenceResiduals, TesteeResiduals, extra=FALSE)
     
 }
 
-SignificanceTest(ReferenceResiduals, TesteeResiduals)
 
-## Change
+## Change - not used
 
 GetChangeResidualTable = function(PredictionTable)
 {
@@ -128,22 +143,12 @@ GetChangeResidualTable = function(PredictionTable)
     return(Prediction - Truth)
 }
 
-# Overall change
-SignificanceTest(GetChangeResidualTable(Reference), GetChangeResidualTable(Testee))
-
 ## ANOVA & Tukey HSD
-# We have three factors: model, class, and location id.
-
-#ANOVAtable = rbind(data.frame(Value = abs(unlist(ReferenceResiduals)), Model="Reference", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))),
-#    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=1:(nrow(ReferenceResiduals)*ncol(ReferenceResiduals))))
-    
-#ANOVAtable = rbind(data.frame(Value = abs(unlist(ReferenceResiduals)), Model="Reference", id=factor(1:(nrow(ReferenceResiduals)))),
-#    data.frame(Value = abs(unlist(TesteeResiduals)), Model="Testee", id=factor(1:(nrow(TesteeResiduals)))))
-#head(table(ANOVAtable$id))
+# We have four factors: model, class, location id and year, but we can merge id and year into one
 
 GetANOVATable = function(ResTables)
 {
-    ANOVAlist = lapply(ResTables, reshape2::melt, variable.name="Class", id.vars=c("location_id", "dataYear"))
+    ANOVAlist = lapply(ResTables, reshape2::melt, variable.name="Class", id.vars=c("location_year"))
     ANOVAlist = lapply(1:length(ANOVAlist), function(x){
         ANOVAlist[[x]][["Model"]] = names(ANOVAlist)[x]
         return(ANOVAlist[[x]])
@@ -154,7 +159,7 @@ GetANOVATable = function(ResTables)
     return(ANOVAtable)
 }
 ANOVAtable = GetANOVATable(ResTables)
-AOVmodel = lmer(value ~ Model + (1 | Class/location_id/dataYear), data=ANOVAtable)
+AOVmodel = lmer(value ~ Model + (1 | Class/location_year), data=ANOVAtable)
 anova(AOVmodel)
 summary(AOVmodel)
 summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
@@ -169,10 +174,10 @@ RFTables = GetResidualTables(list(
     "RF + NDVI-only BFAST Lite" = read.csv("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions-val.csv"),
     "Random Forest + BEAST" = read.csv("../../data/predictions/summer-beast/mean-predictions-val.csv")
 ))
-ANOVAtable = GetANOVATable(RFTables)
-AOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=ANOVAtable))
-RFAOVmodel = value(AOVfuture)
-anova(RFAOVmodel)
+RFANOVAtable = GetANOVATable(RFTables)
+RFAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=RFANOVAtable))
+RFAOVmodel = value(RFAOVfuture)
+anova(RFAOVmodel) # 2323156  8582.2 < 2.2e-16
 summary(RFAOVmodel)
 summary(glht(RFAOVmodel, linfct = mcp(Model = "Tukey")))
 
@@ -183,9 +188,9 @@ DWTables = GetResidualTables(list(
     "Dynamic World + BFAST Lite" = read.csv("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions-val.csv")
 ))
 DWANOVAtable = GetANOVATable(DWTables)
-DWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=DWANOVAtable))
+DWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=DWANOVAtable))
 AOVmodel = value(DWAOVfuture)
-anova(AOVmodel)
+anova(AOVmodel) # 1934436  4489.9 < 2.2e-16
 summary(AOVmodel)
 summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
@@ -195,80 +200,193 @@ RFDWTables = GetResidualTables(list(
     "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-val.csv"),
     "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-val.csv")
 ))
-DWANOVAtable = GetANOVATable(RFDWTables)
-DWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_id/dataYear), data=DWANOVAtable))
-AOVmodel = value(DWAOVfuture)
-anova(AOVmodel)
+RFDWANOVAtable = GetANOVATable(RFDWTables)
+RFDWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=RFDWANOVAtable))
+AOVmodel = value(RFDWAOVfuture)
+anova(AOVmodel) # 991982   44358 < 2.2e-16
 summary(AOVmodel)
 summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
-## TEST
-
-Ref = abs(ReferenceResiduals)
-Tes = abs(TesteeResiduals)
-Ref$id = 1:nrow(Ref)
-Tes$id = 1:nrow(Tes)
-ANOVAtable = rbind(cbind(reshape2::melt(Ref, variable.name="Class", id.vars="id"), Model="Reference"),
-                   cbind(reshape2::melt(Tes, variable.name="Class", id.vars="id"), Model="Testee"))
-ANOVAtable$id = as.factor(ANOVAtable$id)
-ANOVAtable$Model = as.factor(ANOVAtable$Model)
-
-#summary(aov(Value ~ Model + Error(factor(id)), ANOVAtable)) # CRASH
-AOVmodel = lmer(value ~ Model + (1 | Class/id), data=ANOVAtable) # Completes within seconds
-
-t.test(abs(unlist(ReferenceResiduals)), abs(unlist(TesteeResiduals)), paired=TRUE) # p-value = 0.08352, t = 1.7306, df = 1071993,
-
-anova(AOVmodel)
+# RF cropland vs DF cropland
+RFDWCrops = RFDWANOVAtable[RFDWANOVAtable$Class == "crops.x", ]
+RFDWCropAOVfuture = future(lmer(value ~ Model + (1 | location_year), data=RFDWCrops))
+AOVmodel = value(RFDWCropAOVfuture)
+anova(AOVmodel) # 141709  95.153 < 2.2e-16
 summary(AOVmodel)
-summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
-
-
-# test
-Ref = head(ReferenceResiduals)
-Tes = head(TesteeResiduals)
-
-Ref = abs(Ref)
-Tes = abs(Tes)
-Ref$id = 1:6
-Tes$id = 1:6
-ANOVAtable = rbind(cbind(reshape2::melt(Ref, variable.name="Class", id.vars="id"), Model="Reference"),
-                   cbind(reshape2::melt(Tes, variable.name="Class", id.vars="id"), Model="Testee"))
-ANOVAtable$id = as.factor(ANOVAtable$id)
-ANOVAtable$Model = as.factor(ANOVAtable$Model)
-
-t.test(abs(unlist(Ref[1])), abs(unlist(Tes[1])), paired=TRUE)
-AOVmodel = lmer(value ~ Model + (1 | id) + (1 | Class), data=ANOVAtable)
-anova(AOVmodel)
+# DW classes
+DWClasses = RFDWANOVAtable[RFDWANOVAtable$Model == "Dynamic World",]
+DWClassAOVfuture = future(lmer(value ~ Class + (1 | location_year), data=DWClasses))
+AOVmodel = value(DWClassAOVfuture)
+anova(AOVmodel) # 991963   24256 < 2.2e-16
 summary(AOVmodel)
-summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+summary(glht(AOVmodel, linfct = mcp(Class = "Tukey")))
 
-AOVmodel = lmer(value ~ Model + (1 | id), data=ANOVAtable)
-anova(AOVmodel)
+# Are trees overestimated by DW?
+DW = read.csv("../../data/predictions/dynamicworld/dynamicworld-val.csv")
+DW$trees.res = DW[["tree.x"]] - DW[["tree.y"]]
+t.test(DW[["trees.res"]]) # Significantly underestimated: t = -8.1808, df = 141989, p-value = 2.843e-16
+t.test(sample(DW[["trees.res"]], 100000))
+
+## Change
+
+# RF
+ChangeRFTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-change_val_scaled.csv"),
+    "Random Forest + LOESS" = read.csv("../../data/predictions/summer-loess/mean_predictions-change_val_scaled.csv"),
+    "Random Forest + BFAST Lite" = read.csv("../../data/predictions/summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-change_val_scaled.csv"),
+    "RF + NDVI-only BFAST Lite" = read.csv("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions-change_val_scaled.csv"),
+    "Random Forest + BEAST" = read.csv("../../data/predictions/summer-beast/mean-predictions-change_val_scaled.csv")
+), YearVar="Years")
+
+ChangeRFANOVAtable = GetANOVATable(ChangeRFTables)
+ChangeRFAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=ChangeRFANOVAtable))
+RFAOVmodel = value(ChangeRFAOVfuture)
+anova(RFAOVmodel) # 1858527   41368 < 2.2e-16
+summary(RFAOVmodel)
+summary(glht(RFAOVmodel, linfct = mcp(Model = "Tukey")))
+
+# DW
+ChangeDWTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-change_val_scaled.csv"),
+    "Dynamic World + LOESS" = read.csv("../../data/predictions/dynamicworld-loess/predictions-change_val_scaled.csv"),
+    "Dynamic World + BFAST Lite" = read.csv("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions-change_val_scaled.csv")
+), YearVar="Years")
+ChangeDWANOVAtable = GetANOVATable(ChangeDWTables)
+ChangeDWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=ChangeDWANOVAtable))
+AOVmodel = value(ChangeDWAOVfuture)
+anova(AOVmodel) # 1512615   52296 < 2.2e-16
 summary(AOVmodel)
-summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
-AOVmodel = lmer(value ~ Model + (1 | Class), data=ANOVAtable)
-anova(AOVmodel)
+# RF vs DW
+
+RFDWChangeTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-change_val_scaled.csv"),
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-change_val_scaled.csv")
+), YearVar="Years")
+RFDWChangeANOVAtable = GetANOVATable(RFDWChangeTables)
+RFDWChangeAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=RFDWChangeANOVAtable))
+AOVmodel = value(RFDWAOVfuture)
+anova(AOVmodel) # 991982   44358 < 2.2e-16
 summary(AOVmodel)
-summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
-t.test(abs(unlist(Ref[1:7])), abs(unlist(Tes[1:7])), paired=TRUE) # Pair all observations regardless of class
-AOVmodel = lmer(value ~ Model + (1 | Class/id), data=ANOVAtable) # Same as the paired t-test above
-anova(AOVmodel)
+## Trends
+# RF
+TrendRFTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-trends-yearly.csv"),
+    "Random Forest + LOESS" = read.csv("../../data/predictions/summer-loess/mean_predictions-trends-yearly.csv"),
+    "Random Forest + BFAST Lite" = read.csv("../../data/predictions/summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-trends-yearly.csv"),
+    "RF + NDVI-only BFAST Lite" = read.csv("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions-trends-yearly.csv"),
+    "Random Forest + BEAST" = read.csv("../../data/predictions/summer-beast/mean-predictions-trends-yearly.csv")
+), VarName="ChangeTrend")
+
+TrendRFANOVAtable = GetANOVATable(TrendRFTables)
+TrendRFAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=TrendRFANOVAtable))
+RFAOVmodel = value(TrendRFAOVfuture)
+anova(RFAOVmodel) # 464628  4273.9 < 2.2e-16
+summary(RFAOVmodel)
+summary(glht(RFAOVmodel, linfct = mcp(Model = "Tukey")))
+
+# DW
+TrendDWTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-trends-yearly.csv"),
+    "Dynamic World + LOESS" = read.csv("../../data/predictions/dynamicworld-loess/predictions-trends-yearly.csv"),
+    "Dynamic World + BFAST Lite" = read.csv("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions-trends-yearly.csv")
+), VarName="ChangeTrend")
+TrendDWANOVAtable = GetANOVATable(TrendDWTables)
+TrendDWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=TrendDWANOVAtable))
+AOVmodel = value(TrendDWAOVfuture)
+anova(AOVmodel) # 415891    4905 < 2.2e-16
 summary(AOVmodel)
-summary(glht(AOVmodel, linfct = mcp(Model = "Tukey"), test=adjusted("holm")))
-                   
-# Input: list of residuals from a particular group
-ANOVATest = function(ModelList)
-{
-    # Overall MAE
-    MAEtpval = t.test(abs(unlist(ReferenceResiduals)), abs(unlist(TesteeResiduals)), paired=TRUE)$p.val # With normality assumption p=0.08
-    MAEwpval = wilcox.test(abs(unlist(ReferenceResiduals)), abs(unlist(TesteeResiduals)), paired=TRUE)$p.val # Without it p<0.001
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
 
-    # Overall RMSE
-    RMSEtpval = t.test(unlist(ReferenceResiduals)^2, unlist(TesteeResiduals)^2, paired=TRUE)$p.val # p<0.001
-    RMSEwpval = wilcox.test(unlist(ReferenceResiduals)^2, unlist(TesteeResiduals)^2, paired=TRUE)$p.val# p<0.001
+# RF vs DW
 
-    return(round(matrix(c(MAEtpval, MAEwpval, RMSEtpval, RMSEwpval), 2, 2, dimnames=list(c("T-test", "Wilcoxon test"),c("MAE", "RMSE"))), 3))
-}
+RFDWTrendTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-trends-yearly.csv"),
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-trends-yearly.csv")
+), VarName="ChangeTrend")
+RFDWTrendANOVAtable = GetANOVATable(RFDWTrendTables)
+RFDWTrendAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=RFDWTrendANOVAtable))
+AOVmodel = value(RFDWTrendAOVfuture)
+anova(AOVmodel) # 213856  2222.3 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF cropland vs DF cropland
+RFDWTrendCrops = RFDWTrendANOVAtable[RFDWTrendANOVAtable$Class == "ChangeTrend.crops", ]
+RFDWTrendCropAOVfuture = future(lmer(value ~ Model + (1 | location_year), data=RFDWTrendCrops))
+AOVmodel = value(RFDWTrendCropAOVfuture)
+anova(AOVmodel) # 30550  152.76 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF herbaceous vs DW herbaceous
+RFDWTrendGrass = RFDWTrendANOVAtable[RFDWTrendANOVAtable$Class == "ChangeTrend.grassland", ]
+RFDWTrendGrassAOVfuture = future(lmer(value ~ Model + (1 | location_year), data=RFDWTrendGrass))
+AOVmodel = value(RFDWTrendGrassAOVfuture)
+anova(AOVmodel) # 30550  432.75 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+## Variability
+# RF
+VarRFTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-trends-yearly.csv"),
+    "Random Forest + LOESS" = read.csv("../../data/predictions/summer-loess/mean_predictions-trends-yearly.csv"),
+    "Random Forest + BFAST Lite" = read.csv("../../data/predictions/summer-bfl-m30-trend-scaled-h016-fb/mean-predictions-trends-yearly.csv"),
+    "RF + NDVI-only BFAST Lite" = read.csv("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions-trends-yearly.csv"),
+    "Random Forest + BEAST" = read.csv("../../data/predictions/summer-beast/mean-predictions-trends-yearly.csv")
+), VarName="ChangeRMSD")
+
+VarRFANOVAtable = GetANOVATable(VarRFTables)
+VarRFAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=VarRFANOVAtable))
+RFAOVmodel = value(VarRFAOVfuture)
+anova(RFAOVmodel) # 464628   20106 < 2.2e-16
+summary(RFAOVmodel)
+summary(glht(RFAOVmodel, linfct = mcp(Model = "Tukey")))
+
+# DW
+VarDWTables = GetResidualTables(list(
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-trends-yearly.csv"),
+    "Dynamic World + LOESS" = read.csv("../../data/predictions/dynamicworld-loess/predictions-trends-yearly.csv"),
+    "Dynamic World + BFAST Lite" = read.csv("../../data/predictions/dynamicworld-bfl-m30-trend-h016/predictions-trends-yearly.csv")
+), VarName="ChangeRMSD")
+VarDWANOVAtable = GetANOVATable(VarDWTables)
+VarDWAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=VarDWANOVAtable))
+AOVmodel = value(VarDWAOVfuture)
+anova(AOVmodel) # 415882   29093 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF vs DW
+
+RFDWVarTables = GetResidualTables(list(
+    "Random Forest regression" = read.csv("../../data/predictions/summer/mean_predictions_scaled-trends-yearly.csv"),
+    "Dynamic World" = read.csv("../../data/predictions/dynamicworld/dynamicworld-trends-yearly.csv")
+), VarName="ChangeRMSD")
+RFDWVarANOVAtable = GetANOVATable(RFDWVarTables)
+RFDWVarAOVfuture = future(lmer(value ~ Model + (1 | Class/location_year), data=RFDWVarANOVAtable))
+AOVmodel = value(RFDWVarAOVfuture)
+anova(AOVmodel) # 213856  7293.6 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF cropland vs DF cropland
+RFDWVarCrops = RFDWVarANOVAtable[RFDWVarANOVAtable$Class == "ChangeRMSD.crops", ]
+RFDWVarCropAOVfuture = future(lmer(value ~ Model + (1 | location_year), data=RFDWVarCrops))
+AOVmodel = value(RFDWVarCropAOVfuture)
+anova(AOVmodel) # 30550  115.05 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
+
+# RF herbaceous vs DW herbaceous
+RFDWVarGrass = RFDWVarANOVAtable[RFDWVarANOVAtable$Class == "ChangeRMSD.grassland", ]
+RFDWVarGrassAOVfuture = future(lmer(value ~ Model + (1 | location_year), data=RFDWVarGrass))
+AOVmodel = value(RFDWVarGrassAOVfuture)
+anova(AOVmodel) # 30550  324.03 < 2.2e-16
+summary(AOVmodel)
+summary(glht(AOVmodel, linfct = mcp(Model = "Tukey")))
