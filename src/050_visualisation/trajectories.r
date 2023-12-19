@@ -429,5 +429,6 @@ Legend = get_legend(Bristol)
 ggdraw(plot_grid(Bristol + theme(legend.position='none'), Kazakhstan1 + theme(legend.position='none'), Kazakhstan2 + theme(legend.position='none'), Legend, ncol=1, rel_heights = c(2,2,2,1)))
 ggsave("../../output/2023-11-02-model-timeseries.pdf", width=8.11, height=10.2)
 
-PlotClass(1971773, NDVImodels, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_limit=c(0,100), y_label="Fraction of built-up / NDVI (%)")
+PlotClass(1971773, NDVImodels, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_label="Fraction of built-up / NDVI (%)")
+PlotClass(1971773, NDVImodels, "tree", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_limit=c(0,50), y_label="Fraction of trees / NDVI (%)")
 PlotClass(2804358, NDVImodels, "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_limit=c(0,100), y_label="Fraction of water / NDVI (%)")
