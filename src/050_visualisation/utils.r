@@ -76,7 +76,8 @@ VisualiseModelStats = function(InputDir=NULL, InputPattern=NULL, InputFiles=NULL
 # Blues are DW, greens are LOESS/BEST, reds are BFAST Lite
 ModelPalette = c("Dynamic World" = "#0000FF", "Dynamic World + LOESS" = "#00AAFF", "Dynamic World + BFAST Lite" = "#AA00FF",
                 "Random Forest regression" = "#000000", "Random Forest + LOESS" = "#00FF00", "Random Forest + BFAST Lite" = "#FF0000",
-                "RF + NDVI-only BFAST Lite" = "#880000", "Random Forest + BEAST" = "#008800", "Reference" = "#000088")
+                "RF + NDVI-only BFAST Lite" = "#880000", "Random Forest + BEAST" = "#008800", "Reference" = "#000088",
+                "NDVI" = "#00AA00")
 
 # shift_legend from Z.Lin of https://stackoverflow.com/a/54438496
 library(gtable)

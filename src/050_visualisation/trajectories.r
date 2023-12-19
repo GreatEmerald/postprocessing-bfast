@@ -1,9 +1,12 @@
 # Visualise individual pixel trajectories
 # Based on the LPS code
 library(ggplot2)
+library(sf)
+library(reshape2)
 
 source("../utils/load-sampling-data.r")
 source("../utils/covariate-names.r")
+source("../utils/utils.r")
 source("utils.r")
 
 # Load validation data
@@ -14,7 +17,7 @@ ReferenceData = read.csv(ReferenceCSV)
 ReferenceData = RenameReferenceData(ReferenceData)
 ReferenceData = TidyData(ReferenceData)
 
-#DynamicWorld = FlattenGPKG("../../data/WURChange20152019_DynamicWorld_TS.gpkg")
+#DynamicWorld = FlattenGPKG("../../data/WURChan1,]ge20152019_DynamicWorld_TS.gpkg")
 #DynamicWorld = RenameReferenceData(DynamicWorld)
 #DynamicWorld = ReclassifyAndScale(DynamicWorld)
 
@@ -30,12 +33,26 @@ BEAST = readRDS("../../data/predictions/summer-beast/mean-predictions.rds")
 LOESS = readRDS("../../data/predictions/dynamicworld-loess/predictions.rds")
 BFBaseline = readRDS("../../data/predictions/summer-bfbaseline-m02-harmon-scaled/mean_predictions.rds")
 
+# Add NDVI
+NDVI = st_read("../../data/wur_validation_features/_NDVI.gpkg")
+# Include location_id timestamp.x and NDVI as column name
+NDVIm = SFToMatrix(NDVI)
+NDVIm = as.data.frame(NDVIm)
+NDVIm$location_id = rownames(NDVIm)
+NDVIm = melt(NDVIm, id.vars="location_id", value.name="NDVI", variable.name="timestamp.x", na.rm=TRUE)
+NDVIm[["timestamp.x"]] = as.Date(NDVIm[["timestamp.x"]], "X%Y.%m.%d")
+NDVIc = NDVIm
+for (class in GetCommonClassNames())
+    NDVIc[[class]] = NDVIc[["NDVI"]]*100
+
 #models = list(RFPredictions=RFPredictions, RFMedian=RFMedian, BFBaseline=BFBaseline,
 #    BFLMedianPredictions=BFLPredictions, DynamicWorld = DynamicWorld, DWBFL = DWBFL)
 
 models = list(`Dynamic World` = DynamicWorld, `Dynamic World + LOESS`=LOESS, `Dynamic World + BFAST Lite` = DWBFL,
     `Random Forest regression`=RFPredictions, `Random Forest + BFAST Lite`=BFLPredictions,
     `RF + NDVI-only BFAST Lite`=BFBaseline,  `Random Forest + BEAST`=BEAST)
+    
+NDVImodels = list(`Dynamic World` = DynamicWorld, "NDVI" = NDVIc)
 
 PlotTrajectory = function(location_id, models, classes=GetCommonClassNames(),
     legend.pos="left", xlim=c(as.Date("2015-01-01"), as.Date("2020-01-01")),
@@ -344,7 +361,8 @@ PlotTrajectory(ChangeID, models, classes=c("bare", "shrub", "grassland", "crops"
 # Make a plot of a single class
 PlotClass = function(location_id, models, class="urban_built_up",
     xlim=c(as.Date("2015-01-01"), as.Date("2020-01-01")),
-    title="", size=dev.size())
+    title="", size=dev.size(),
+    y_limit=NULL, y_label=NULL)
 {
     # Filter all data to the location id
     ReferenceData = ReferenceData[ReferenceData$location_id == location_id,]
@@ -378,15 +396,16 @@ PlotClass = function(location_id, models, class="urban_built_up",
     Cols = RColorBrewer::brewer.pal(length(models)+1, "Set1")
     # 5 is the reference colour, bring it to front
     Cols = Cols[c(5,1:4,6:length(Cols))]
+    if (is.null(y_label)) y_label = paste("Fraction of", PrettifyNames(class))
         
     Output = ggplot(PlotData, aes(Date, Fraction, group=Model)) + geom_line(aes(colour=Model, linewidth=Model)) +
         scale_colour_manual(values=ModelPalette) +
         scale_x_date(date_breaks="1 year", limits=xlim) +
         scale_linewidth_manual(values=c(1.5, rep(0.5, length(models)))) +
-        ylab(paste("Fraction of", PrettifyNames(class))) +
+        ylab(y_label) +
         theme(legend.position="bottom")
        # geom_point()
-        
+    if (!is.null(y_limit)) Output = Output+ylim(y_limit)
     
     # Save in files
     ggsave(file.path(PlotOutDir, paste0(Sys.Date(), "-", location_id, "-", class, ".pdf")), Output, width=size[1], height=size[2], units="in")
@@ -409,3 +428,6 @@ Legend = get_legend(Bristol)
 
 ggdraw(plot_grid(Bristol + theme(legend.position='none'), Kazakhstan1 + theme(legend.position='none'), Kazakhstan2 + theme(legend.position='none'), Legend, ncol=1, rel_heights = c(2,2,2,1)))
 ggsave("../../output/2023-11-02-model-timeseries.pdf", width=8.11, height=10.2)
+
+PlotClass(1971773, NDVImodels, "urban_built_up", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_limit=c(0,100), y_label="Fraction of built-up / NDVI (%)")
+PlotClass(2804358, NDVImodels, "water", xlim=c(as.Date("2015-01-01"), as.Date("2021-01-01")), y_limit=c(0,100), y_label="Fraction of water / NDVI (%)")
